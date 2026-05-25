@@ -1,0 +1,9 @@
+node_modules
+.git
+.agents
+.pi
+deploy
+docs
+packages/proxy/test
+packages/proxy/.env
+*.db

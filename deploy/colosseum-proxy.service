@@ -1,0 +1,17 @@
+[Unit]
+Description=Colosseum LLM Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/colosseum
+ExecStart=/home/ubuntu/.bun/bin/bun run packages/proxy/src/index.ts
+Restart=always
+RestartSec=5
+EnvironmentFile=/home/ubuntu/colosseum/packages/proxy/.env
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
