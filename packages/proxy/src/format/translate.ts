@@ -1,3 +1,4 @@
+import { randomBytes } from 'crypto'
 import type { OpenAIResponse, AnthropicResponse } from '../types'
 
 export function translateOpenAIToAnthropic(res: OpenAIResponse): AnthropicResponse {
@@ -22,8 +23,9 @@ export function openAIStreamToAnthropicStream(
 ): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()
   const decoder = new TextDecoder()
-  const msgId = `msg_${Math.random().toString(36).slice(2, 10)}`
+  const msgId = `msg_${randomBytes(8).toString('hex')}`
   let headerSent = false
+  let buf = ''
 
   function emit(event: string, data: unknown): Uint8Array {
     return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -32,8 +34,10 @@ export function openAIStreamToAnthropicStream(
   return openAIStream.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true })
-        for (const line of text.split('\n')) {
+        buf += decoder.decode(chunk, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
           if (!line.startsWith('data: ')) continue
           const raw = line.slice(6).trim()
           if (raw === '[DONE]') {

@@ -36,11 +36,14 @@ export function extractUsageFromStream(
   onUsage: (usage: OAIUsage) => void,
 ): { stream: ReadableStream<Uint8Array> } {
   const decoder = new TextDecoder()
+  let buf = ''
   const transformed = stream.pipeThrough(
     new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {
-        const text = decoder.decode(chunk, { stream: true })
-        for (const line of text.split('\n')) {
+        buf += decoder.decode(chunk, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
           if (!line.startsWith('data: ') || line.includes('[DONE]')) continue
           try {
             const data = JSON.parse(line.slice(6)) as { usage?: OAIUsage }
@@ -48,6 +51,15 @@ export function extractUsageFromStream(
           } catch { /* ignore parse errors */ }
         }
         controller.enqueue(chunk)
+      },
+      flush() {
+        if (!buf) return
+        if (buf.startsWith('data: ') && !buf.includes('[DONE]')) {
+          try {
+            const data = JSON.parse(buf.slice(6)) as { usage?: OAIUsage }
+            if (data.usage) onUsage(data.usage)
+          } catch { /* ignore */ }
+        }
       },
     }),
   )

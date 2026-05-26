@@ -91,8 +91,12 @@ export function buildApp(db: Database) {
 if (import.meta.main) {
   const db = openDb()
   seedProviders(db)
-  await discoverModels(db)
   const PORT = Number(process.env.PORT ?? 3000)
-  buildApp(db).listen(PORT)
+  const server = buildApp(db).listen(PORT)
   console.log(`Payprompt proxy running on http://localhost:${PORT}`)
+  // Discover models in the background — don't block accepting traffic
+  discoverModels(db).then(
+    () => console.log('[discovery] complete'),
+    (e) => console.warn('[discovery]', (e as Error).message),
+  )
 }
