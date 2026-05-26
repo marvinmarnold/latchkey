@@ -82,20 +82,28 @@ export function seedProviders(db: Database): void {
     ],
   )
 
+  // Exact aliases for HF repo IDs → DeepSeek API model names
+  const deepseekAliases: Array<[string, string, string]> = [
+    ['deepseek-ai/DeepSeek-V3',        'deepseek-v4-pro',   'twoshoes-ds-v3'],
+    ['deepseek-ai/DeepSeek-V4-Pro',    'deepseek-v4-pro',   'twoshoes-ds-v4-pro'],
+    ['deepseek-ai/DeepSeek-V4-Flash',  'deepseek-v4-flash', 'twoshoes-ds-v4-flash'],
+    ['deepseek-ai/DeepSeek-R1',        'deepseek-v4-flash', 'twoshoes-ds-r1'],
+  ]
+  for (const [modelId, providerModelId, id] of deepseekAliases) {
+    db.run(
+      `INSERT OR IGNORE INTO listings
+         (id, provider_id, model_id, provider_model_id, upstream_format, endpoint, api_key, price_input, price_output)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, 'twoshoes', modelId, providerModelId, 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
+    )
+  }
+
+  // Prefix catch-all for deepseek- native API names (e.g. deepseek-v4-pro sent directly)
   db.run(
     `INSERT OR IGNORE INTO listings
        (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      'twoshoes-deepseek',
-      'twoshoes',
-      'deepseek-',
-      'openai',
-      'https://api.deepseek.com/v1',
-      process.env.DEEPSEEK_API_KEY ?? null,
-      270,    // ~$0.27/M input
-      1100,   // ~$1.10/M output
-    ],
+    ['twoshoes-deepseek', 'twoshoes', 'deepseek-', 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
   )
 
   // Provider: BigThought — OpenAI only
