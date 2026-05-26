@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import type { BearerToken } from '../types'
 
 export const DOMAIN = {
-  name: 'Colosseum LLM Marketplace',
+  name: 'Payprompt LLM Marketplace',
   version: '1',
   chainId: 8453,
 } as const

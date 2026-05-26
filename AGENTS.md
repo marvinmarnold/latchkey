@@ -1,4 +1,4 @@
-# Colosseum Copilot — LLM Proxy/Marketplace Research
+# Payprompt Copilot — LLM Proxy/Marketplace Research
 
 ## Project Overview
 
@@ -13,8 +13,8 @@ Building a crypto-native LLM proxy: **one endpoint, one wallet, every model. No 
 ## API Configuration
 
 ```bash
-export COLOSSEUM_COPILOT_API_BASE="https://copilot.colosseum.com/api/v1"
-export COLOSSEUM_COPILOT_PAT="<set in environment>"  # expires 2026-08-20
+export PAYPROMPT_COPILOT_API_BASE="https://copilot.payprompt.com/api/v1"
+export PAYPROMPT_COPILOT_PAT="<set in environment>"  # expires 2026-08-20
 ```
 
 Key endpoints:
@@ -47,7 +47,7 @@ Renaissance (Mar 2024), Radar (Sep 2024), Breakout (Apr 2025), Cypherpunk (Sep 2
 
 ## Project Conventions
 
-- Use `colosseum-copilot` skill for all API interactions
+- Use `payprompt-copilot` skill for all API interactions
 - Before any creative/design work, invoke brainstorming skill
 - Before committing to architecture decisions, invoke grill-me skill
 - Save research findings to `research/` directory with dated filenames

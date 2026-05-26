@@ -17,11 +17,11 @@ sudo apt-get update -qq
 sudo apt-get install -y caddy
 
 echo "==> Cloning or updating repo"
-REPO_DIR="$HOME/colosseum"
+REPO_DIR="$HOME/payprompt"
 if [ -d "$REPO_DIR/.git" ]; then
   git -C "$REPO_DIR" pull
 else
-  git clone https://github.com/YOUR_ORG/colosseum.git "$REPO_DIR"
+  git clone https://github.com/YOUR_ORG/payprompt.git "$REPO_DIR"
 fi
 
 echo "==> Installing dependencies"
@@ -41,10 +41,10 @@ if [ ! -f "$ENV_FILE" ]; then
 fi
 
 echo "==> Installing systemd service"
-sudo cp "$REPO_DIR/deploy/colosseum-proxy.service" /etc/systemd/system/
+sudo cp "$REPO_DIR/deploy/payprompt-proxy.service" /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable colosseum-proxy
-sudo systemctl restart colosseum-proxy
+sudo systemctl enable payprompt-proxy
+sudo systemctl restart payprompt-proxy
 
 echo "==> Configuring Caddy"
 sudo cp "$REPO_DIR/deploy/Caddyfile" /etc/caddy/Caddyfile

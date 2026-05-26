@@ -92,5 +92,5 @@ if (import.meta.main) {
   seedProviders(db)
   const PORT = Number(process.env.PORT ?? 3000)
   buildApp(db).listen(PORT)
-  console.log(`Colosseum proxy running on http://localhost:${PORT}`)
+  console.log(`Payprompt proxy running on http://localhost:${PORT}`)
 }
