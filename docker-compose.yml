@@ -9,7 +9,9 @@ services:
       PORT: 3000
       DB_PATH: /app/data/payprompt.db
       NODE_ENV: production
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     restart: unless-stopped
 
 volumes:
