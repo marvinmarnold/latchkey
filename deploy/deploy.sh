@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 # Deploy payprompt proxy to a fresh Ubuntu VPS via SSH password auth.
-# Usage: DEPLOY_HOST=1.2.3.4 DEPLOY_USER=root DEPLOY_PASSWORD=xxx ANTHROPIC_API_KEY=xxx DEEPSEEK_API_KEY=xxx OPENAI_API_KEY=xxx bash deploy/deploy.sh
+# Usage: bun run deploy  (reads packages/proxy/.env automatically)
 set -euo pipefail
+
+# Load .env if not already set via environment
+ENV_FILE="$(dirname "$0")/../packages/proxy/.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
 
 HOST="${DEPLOY_HOST:?DEPLOY_HOST env var required}"
 DEPLOY_USER="${DEPLOY_USER:?DEPLOY_USER env var required}"
