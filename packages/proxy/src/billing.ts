@@ -13,13 +13,13 @@ export function computeCost(
 
 export function logUsage(db: Database, record: UsageRecord): number {
   db.run(
-    `INSERT INTO billing_log (id, caller_address, provider_id, hf_repo_id, input_tokens, output_tokens, cost_usdc, created_at)
+    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       randomUUID(),
       record.callerAddress,
-      record.providerId,
-      record.hfRepoId,
+      record.listingId,
+      record.modelId,
       record.inputTokens,
       record.outputTokens,
       record.costUsdc,

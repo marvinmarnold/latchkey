@@ -5,7 +5,7 @@ import { verifyBearerToken, extractTokenFromRequest } from './middleware/auth'
 import { assertSufficientBalance } from './middleware/balance'
 import { normaliseAnthropicToOpenAI } from './format/normalise'
 import { translateOpenAIToAnthropic, openAIStreamToAnthropicStream } from './format/translate'
-import { selectProvider, penaliseProvider } from './router'
+import { selectListing, penaliseListing } from './router'
 import { forwardToProvider } from './forwarder'
 import { extractUsageFromStream, computeCost, logUsage } from './billing'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
@@ -29,16 +29,16 @@ export function buildApp(db: Database) {
       }
     })
 
-    .post('/v1/chat/completions', async ({ body, callerAddress, error, set }) => {
+    .post('/v1/chat/completions', async ({ body, callerAddress, set }) => {
       const req = body as OpenAIRequest
-      const provider = selectProvider(db, req.model)
-      if (!provider) return error(404, { error: { type: 'not_found_error', message: `No provider for model: ${req.model}` } })
+      const listing = selectListing(db, req.model)
+      if (!listing) return status(404, { error: { type: 'not_found_error', message: `No provider for model: ${req.model}` } })
       try {
-        const { stream, json, isStreaming } = await forwardToProvider(provider, req)
+        const { stream, json, isStreaming } = await forwardToProvider(listing, req, req.model)
         if (isStreaming && stream) {
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, provider.price_input, provider.price_output)
-            logUsage(db, { callerAddress, providerId: provider.id, hfRepoId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
+            logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
           })
           set.headers['Content-Type'] = 'text/event-stream'
           set.headers['Cache-Control'] = 'no-cache'
@@ -46,26 +46,26 @@ export function buildApp(db: Database) {
           return new Response(billedStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, provider.price_input, provider.price_output)
-        logUsage(db, { callerAddress, providerId: provider.id, hfRepoId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
+        logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
         return oaiRes
       } catch (e: unknown) {
-        penaliseProvider(db, provider.id)
-        return error(502, { error: { type: 'api_error', message: (e as Error).message } })
+        penaliseListing(db, listing.id)
+        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
       }
     })
 
-    .post('/v1/messages', async ({ body, callerAddress, error, set }) => {
+    .post('/v1/messages', async ({ body, callerAddress, set }) => {
       const req = body as AnthropicRequest
       const openAIReq = normaliseAnthropicToOpenAI(req)
-      const provider = selectProvider(db, req.model)
-      if (!provider) return error(404, { error: { type: 'not_found_error', message: `No provider for model: ${req.model}` } })
+      const listing = selectListing(db, req.model)
+      if (!listing) return status(404, { error: { type: 'not_found_error', message: `No provider for model: ${req.model}` } })
       try {
-        const { stream, json, isStreaming } = await forwardToProvider(provider, openAIReq)
+        const { stream, json, isStreaming } = await forwardToProvider(listing, openAIReq, req.model)
         if (isStreaming && stream) {
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, provider.price_input, provider.price_output)
-            logUsage(db, { callerAddress, providerId: provider.id, hfRepoId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
+            logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
           })
           const anthropicStream = openAIStreamToAnthropicStream(billedStream)
           set.headers['Content-Type'] = 'text/event-stream'
@@ -74,12 +74,12 @@ export function buildApp(db: Database) {
           return new Response(anthropicStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, provider.price_input, provider.price_output)
-        logUsage(db, { callerAddress, providerId: provider.id, hfRepoId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
+        logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
-        penaliseProvider(db, provider.id)
-        return error(502, { error: { type: 'api_error', message: (e as Error).message } })
+        penaliseListing(db, listing.id)
+        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
       }
     })
 

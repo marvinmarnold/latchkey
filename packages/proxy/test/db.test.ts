@@ -18,9 +18,16 @@ describe('db', () => {
     expect(row).not.toBeNull()
   })
 
-  it('seeds at least one provider when asked', () => {
+  it('creates listings table', () => {
+    const row = db.query(`SELECT name FROM sqlite_master WHERE type='table' AND name='listings'`).get()
+    expect(row).not.toBeNull()
+  })
+
+  it('seeds providers and listings when asked', () => {
     seedProviders(db)
-    const count = (db.query('SELECT COUNT(*) as n FROM providers').get() as { n: number }).n
-    expect(count).toBeGreaterThan(0)
+    const providers = (db.query('SELECT COUNT(*) as n FROM providers').get() as { n: number }).n
+    const listings = (db.query('SELECT COUNT(*) as n FROM listings').get() as { n: number }).n
+    expect(providers).toBe(2)
+    expect(listings).toBeGreaterThan(0)
   })
 })

@@ -1,37 +1,56 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { openDb, closeDb } from '../src/db'
-import { selectProvider } from '../src/router'
+import { selectListing } from '../src/router'
 import type { Database } from 'bun:sqlite'
 
 let db: Database
 
 beforeEach(() => {
   db = openDb(':memory:')
+  // Seed two providers
+  db.run(`INSERT INTO providers (id, name) VALUES ('pa', 'ProviderA'), ('pb', 'ProviderB')`)
   db.run(`
-    INSERT INTO providers (id, hf_repo_id, provider_model_id, endpoint, type, price_input, price_output, active)
+    INSERT INTO listings (id, provider_id, model_id, model_prefix, upstream_format, endpoint, price_input, price_output, active)
     VALUES
-      ('p1', 'deepseek-ai/DeepSeek-V3', 'deepseek-chat', 'https://expensive.example.com/v1', 'self_hosted', 500, 2000, 1),
-      ('p2', 'deepseek-ai/DeepSeek-V3', 'deepseek-chat', 'https://cheap.example.com/v1',     'self_hosted', 200, 800,  1),
-      ('p3', 'meta-llama/Llama-3-70B',  'llama3-70b',   'https://llama.example.com/v1',      'self_hosted', 100, 400,  1),
-      ('p4', 'deepseek-ai/DeepSeek-V3', 'deepseek-chat', 'https://inactive.example.com/v1',  'self_hosted', 10,  10,   0)
+      ('l1', 'pa', NULL, 'deepseek-', 'openai', 'https://expensive.example.com/v1', 500,  2000, 1),
+      ('l2', 'pb', NULL, 'deepseek-', 'openai', 'https://cheap.example.com/v1',     200,  800,  1),
+      ('l3', 'pa', NULL, 'claude-',   'anthropic', 'https://anthropic.example.com', 3000, 15000, 1),
+      ('l4', 'pb', 'o1', NULL,        'openai', 'https://openai.example.com/v1',    2500, 10000, 1),
+      ('l5', 'pa', NULL, 'deepseek-', 'openai', 'https://inactive.example.com/v1',  10,   10,   0)
   `)
 })
 afterEach(() => closeDb(db))
 
-describe('selectProvider', () => {
-  it('returns cheapest active provider for model', () => {
-    const provider = selectProvider(db, 'deepseek-ai/DeepSeek-V3')
-    expect(provider?.id).toBe('p2')
+describe('selectListing', () => {
+  it('returns cheapest active listing by prefix match', () => {
+    const listing = selectListing(db, 'deepseek-chat')
+    expect(listing?.id).toBe('l2')
   })
 
-  it('returns null when no active provider exists for model', () => {
-    const provider = selectProvider(db, 'unknown/Model')
-    expect(provider).toBeNull()
+  it('returns null when no active listing matches', () => {
+    const listing = selectListing(db, 'unknown-model')
+    expect(listing).toBeNull()
   })
 
-  it('ignores inactive providers', () => {
-    db.run(`UPDATE providers SET active = 0 WHERE id IN ('p1','p2')`)
-    const provider = selectProvider(db, 'deepseek-ai/DeepSeek-V3')
-    expect(provider).toBeNull()
+  it('ignores inactive listings', () => {
+    db.run(`UPDATE listings SET active = 0 WHERE id = 'l2'`)
+    const listing = selectListing(db, 'deepseek-chat')
+    expect(listing?.id).toBe('l1')
+  })
+
+  it('ignores listings from inactive providers', () => {
+    db.run(`UPDATE providers SET active = 0 WHERE id = 'pb'`)
+    const listing = selectListing(db, 'deepseek-chat')
+    expect(listing?.id).toBe('l1')
+  })
+
+  it('matches exact model_id over prefix', () => {
+    const listing = selectListing(db, 'o1')
+    expect(listing?.id).toBe('l4')
+  })
+
+  it('matches anthropic prefix', () => {
+    const listing = selectListing(db, 'claude-sonnet-4-6')
+    expect(listing?.id).toBe('l3')
   })
 })
