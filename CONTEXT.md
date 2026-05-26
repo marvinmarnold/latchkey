@@ -3,18 +3,25 @@
 ## Marketplace
 A listing marketplace where independent Providers register their own inference endpoints and prices. The platform routes requests and handles billing but never holds upstream API keys. Providers compete on price (v1) and eventually on quality heuristics (v2).
 
-Excludes: reselling proprietary model APIs (OpenAI, Anthropic, etc.) — only open-weight models where community inference does not violate terms of service.
+Long-term policy: open-weight models only, where community inference does not violate terms of service. Proprietary APIs (OpenAI, Anthropic, etc.) are not technically blocked — the platform imposes no enforcement — but are excluded by marketplace policy. During development and testing, proprietary APIs may be registered as ordinary Providers to validate routing, billing, and format translation before open-weight providers are available.
 
 ## Provider
-An entity that serves inference for one or more open-weight Models and registers an endpoint + price with the Marketplace. Two modes:
+An entity that serves inference for one or more Models and registers listings with the Marketplace. A Provider is an identity and kill-switch record — it owns a name and an active flag. The routing details (endpoint, API key, price, reliability) live on each individual Listing, not on the Provider entity itself. A single Provider may hold listings that use different upstream services and different API keys. Dev seed includes two Providers: **TwoShoes** (DeepSeek + Anthropic listings) and **BigThought** (OpenAI listings).
 
-- **Self-hosted Provider** — runs inference directly (vLLM, Ollama, llama.cpp, etc.) and exposes an OpenAI-compatible endpoint. The Marketplace forwards requests directly.
-- **API-delegating Provider** — holds API credentials to an open-weight model API service (DeepSeek, Groq, Together AI, Fireworks, Hyperbolic, etc.) and delegates those credentials to the protocol, which makes requests on their behalf.
+Two listing modes:
 
-The Marketplace does not control or custody Provider infrastructure. Providers may only list open-weight Models — proprietary model APIs (OpenAI, Anthropic, Google) are excluded regardless of provider type.
+- **Self-hosted** — runs inference directly (vLLM, Ollama, llama.cpp, etc.) and exposes an OpenAI-compatible endpoint. The Marketplace forwards requests directly.
+- **API-delegating** — delegates to an upstream API service (DeepSeek, Groq, Together AI, Fireworks, Hyperbolic, etc.) using credentials held by the Provider.
+
+The Marketplace does not control or custody Provider infrastructure.
+
+## Listing
+A single model offered by a Provider at a specific price. Carries its own endpoint URL, upstream format, API key (if any), input/output prices, context length, provider-side model ID, reliability score, and active flag. The unit of routing: the Router selects a Listing, not a Provider. A Listing is only routable when both its own active flag and its Provider's active flag are true.
+
+`upstream_format` declares what wire format the provider endpoint speaks: `openai` (default — covers DeepSeek, Together AI, self-hosted vLLM, etc.) or `anthropic`. The forwarder uses this to decide whether to send the internal OpenAI-format request as-is or convert it to Anthropic format at egress.
 
 ## Model
-An open-weight model identified by its Hugging Face repo ID (e.g. `meta-llama/Llama-3.1-70B-Instruct`). This is the canonical routing key. Providers additionally expose metadata (quantization, context length, avg latency) that users can filter on, but the HF repo ID defines what model is being served.
+A model identified by a string ID that Callers put in the `model` field. The Router matches this against Listings using two strategies, in order: (1) exact `model_id` match — used for specific models with their own pricing; (2) prefix match against `model_prefix` — used for vendor-wide Listings that cover an entire catalogue at a single tier price. Convention: open-weight models use their HuggingFace repo ID (e.g. `meta-llama/Llama-3.1-70B-Instruct`); the platform does not enforce any scheme for proprietary models.
 
 ## Caller
 The primary Caller is an Agent — autonomous software that POSTs to the proxy endpoint without human in the loop. Developers (humans) are secondary callers who use the same endpoint with a manually controlled wallet. No developer dashboard in v1.
@@ -29,9 +36,9 @@ Supported formats (v1): OpenAI (`/v1/chat/completions`), Anthropic (`/v1/message
 The internal normalisation layer translates between formats. LiteLLM is excluded as a dependency (supply chain risk); translation is implemented directly or via a vetted alternative.
 
 ## Router
-The component that, given a user-specified Model, selects the cheapest available Provider serving that Model (v1). Future versions (v2) will route on heuristics beyond cost (latency, reliability score, benchmark quality).
+The component that, given a user-specified Model, selects the cheapest available Listing serving that Model (v1). Future versions (v2) will route on heuristics beyond cost (latency, reliability score, benchmark quality).
 
-Providers are deprioritised (not slashed) for downtime — the Router scores reliability over time and routes away from unreliable Providers without on-chain penalties.
+Listings are deprioritised (not slashed) for downtime — the Router scores reliability per Listing over time and routes away from unreliable Listings without on-chain penalties.
 
 ## Model Verification
 The process by which the Marketplace confirms a Provider is serving the declared Model (HF repo ID).

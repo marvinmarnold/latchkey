@@ -46,11 +46,12 @@ beforeAll(async () => {
     })
   mockServer.listen(MOCK_PORT)
 
-  // In-memory DB with mock provider
+  // In-memory DB with mock provider and listing
   db = openDb(':memory:')
+  db.run(`INSERT INTO providers (id, name) VALUES ('mock-p1', 'MockProvider')`)
   db.run(`
-    INSERT INTO providers (id, hf_repo_id, provider_model_id, endpoint, type, price_input, price_output)
-    VALUES ('mock-p1', 'test/TestModel', 'deepseek-chat', 'http://localhost:${MOCK_PORT}/v1', 'self_hosted', 270, 1100)
+    INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output)
+    VALUES ('mock-l1', 'mock-p1', 'test/TestModel', 'openai', 'http://localhost:${MOCK_PORT}/v1', 270, 1100)
   `)
 
   proxyServer = buildApp(db)

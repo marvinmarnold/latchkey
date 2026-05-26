@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
-import { openDb, closeDb } from '../src/db'
+import { openDb, closeDb, seedProviders } from '../src/db'
 import { logUsage, extractUsageFromStream } from '../src/billing'
 import type { Database } from 'bun:sqlite'
 
 let db: Database
-beforeEach(() => { db = openDb(':memory:') })
+beforeEach(() => {
+  db = openDb(':memory:')
+  seedProviders(db)
+})
 afterEach(() => closeDb(db))
 
 describe('logUsage', () => {
   it('inserts a billing_log row and returns cost', () => {
     const cost = logUsage(db, {
       callerAddress: '0xabc',
-      providerId: 'p1',
-      hfRepoId: 'deepseek-ai/DeepSeek-V3',
+      listingId: 'twoshoes-deepseek',
+      modelId: 'deepseek-chat',
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
       costUsdc: 1370,

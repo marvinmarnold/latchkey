@@ -9,23 +9,30 @@ export type BearerToken = {
   sig: `0x${string}` // EIP-712 signature
 }
 
-// --- Providers ---
+// --- Providers & Listings ---
 
-export type ProviderType = 'self_hosted' | 'api_delegating'
+export type UpstreamFormat = 'openai' | 'anthropic'
 
 export type Provider = {
   id: string
-  hf_repo_id: string         // e.g. "deepseek-ai/DeepSeek-V3"
-  provider_model_id: string  // model name sent to provider (e.g. "deepseek-chat")
-  endpoint: string           // base URL, e.g. "https://api.deepseek.com/v1"
-  type: ProviderType
-  api_key: string | null     // plaintext in MVP; null for self_hosted
-  price_input: number        // USDC micro-units per 1M input tokens
-  price_output: number       // USDC micro-units per 1M output tokens
+  name: string
+  active: number  // 1 = active, 0 = suspended
+}
+
+export type Listing = {
+  id: string
+  provider_id: string
+  model_id: string | null        // exact match routing key (nullable)
+  model_prefix: string | null    // prefix match fallback (nullable)
+  upstream_format: UpstreamFormat
+  endpoint: string               // base URL, e.g. "https://api.deepseek.com/v1"
+  api_key: string | null
+  provider_model_id: string | null  // model name sent upstream; null = pass caller's model through
+  price_input: number            // USDC micro-units per 1M input tokens
+  price_output: number           // USDC micro-units per 1M output tokens
   ctx_length: number | null
-  quantization: string | null
-  reliability: number        // 0–1
-  active: number             // 1 = active, 0 = inactive
+  reliability: number            // 0–1
+  active: number                 // 1 = active, 0 = inactive
 }
 
 // --- OpenAI API format (internal canonical format) ---
@@ -101,8 +108,8 @@ export type AnthropicResponse = {
 
 export type UsageRecord = {
   callerAddress: string
-  providerId: string
-  hfRepoId: string
+  listingId: string
+  modelId: string
   inputTokens: number
   outputTokens: number
   costUsdc: number  // micro-units (1 USDC = 1_000_000)
