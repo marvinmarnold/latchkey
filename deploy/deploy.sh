@@ -54,14 +54,11 @@ mkdir -p /etc/caddy
 
 echo "--- clone or pull repo"
 if [ -d /root/payprompt/.git ]; then
-  git -C /root/payprompt pull
+  git -C /root/payprompt fetch --all
 else
   git clone https://github.com/marvinmarnold/payprompt.git /root/payprompt
+  git -C /root/payprompt fetch --all
 fi
-
-echo "--- install dependencies"
-cd /root/payprompt
-"$HOME/.bun/bin/bun" install --frozen-lockfile
 
 echo "--- install systemd services"
 cp /root/payprompt/deploy/payprompt-proxy.service /etc/systemd/system/
@@ -69,6 +66,10 @@ cp /root/payprompt/deploy/caddy.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable payprompt-proxy caddy
 SETUP
+
+BRANCH="${DEPLOY_BRANCH:-main}"
+echo "==> Checking out branch: $BRANCH"
+$SSH "git -C $APP_DIR checkout $BRANCH && git -C $APP_DIR pull origin $BRANCH && cd $APP_DIR && /root/.bun/bin/bun install --frozen-lockfile"
 
 echo "==> Writing .env"
 $SSH "cat > $APP_DIR/packages/proxy/.env" << ENV
