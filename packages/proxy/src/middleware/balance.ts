@@ -8,11 +8,11 @@ const EVM_CONTRACT_ABI = parseAbi([
 ])
 
 function getEvmClient() {
-  const rpcUrl = process.env.BASE_RPC_URL
-  const isMainnet = rpcUrl?.includes('mainnet') || process.env.NODE_ENV === 'production'
+  const rpcUrl = process.env.BASE_RPC_URL ?? 'https://sepolia.base.org'
+  const isMainnet = rpcUrl.includes('mainnet') && !rpcUrl.includes('sepolia')
   return createPublicClient({
     chain: isMainnet ? base : baseSepolia,
-    transport: http(rpcUrl ?? 'https://sepolia.base.org'),
+    transport: http(rpcUrl),
   })
 }
 
