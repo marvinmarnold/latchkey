@@ -21,33 +21,35 @@ Works out of the box with Claude Code, Cursor, the OpenAI SDK, and anything else
 - Deployed at `https://api.latchkey.me` — Bun + Caddy on Ubuntu VPS
 - Seeded providers: DeepSeek (OpenAI format), Anthropic, OpenAI
 
-### 🔜 Phase 2 — Smart contracts (not started)
+### ✅ Phase 2 — Smart contracts (deployed to Base Sepolia)
 
-> **Research required** — see [Smart contract open questions](#smart-contract-open-questions) below.
+- `PaypromptBalance.sol` deployed at `0x9FDcd9DCe63e29575816c6fa9Df689a9F4566716` on Base Sepolia
+- Callers deposit USDC into the contract; `balances(address)` is the real balance gate
+- Real on-chain balance check via viem `readContract` in `middleware/balance.ts`
+- 1% protocol fee to treasury (`0x1ECF3f51A771983C150b3cB4A2162E89c0A046Fc`) implemented in contract `debit()`
+- **Pending**: per-request on-chain debit (adds latency — deferred to Phase 2.5 batch settlement)
 
-- USDC deposit contract on Base — callers fund a balance on-chain
-- Real balance check replacing the current mock in `middleware/balance.ts`
-- Protocol fee routing (1% of each settlement to treasury)
-- Provider staking — USDC stake required before listing
+### ✅ Phase 3 — zkTLS (stub implemented)
 
-### 🔜 Phase 3 — zkTLS (not started)
+- `tls_proof_queue` SQLite table created; proof job enqueued after every request
+- Background worker (`startProofWorker`) drains queue every 30s — currently logs intent only
+- **Research gap**: no production-ready zkTLS library exists (TLSNotary, Reclaim Protocol, zkPass all pre-production). Proof generation estimated seconds–minutes; async settlement mandatory.
+- When a prover is available: replace `processProofQueue()` in `src/zktls.ts`
 
-- Async TLS proof generation for API-delegating providers (DeepSeek, Groq, etc.)
-- Proves to the chain that the upstream request happened and token counts are accurate
-- Enables trustless billing without the provider running their own infrastructure
-- **Significant research required** — see below
+### ✅ Phase 4 — Model verification (implemented)
 
-### 🔜 Phase 4 — Model verification (not started)
+- `model_fingerprints` SQLite table stores SHA-256 hashes of probe responses
+- Probe sent at startup and every 6 hours to all active listings with API keys
+- Logs warning on response hash drift (bait-and-switch detection)
+- Slashing deferred until on-chain settlement is live
 
-- Fingerprinting at provider onboarding (confirm model identity before listing)
-- Periodic challenge sampling post-listing (detect bait-and-switch)
-- Slashing for fraud
+### ✅ Phase 5 — Solana rail (implemented)
 
-### 🔜 Phase 5 — Solana rail (not started)
-
-- Second funding chain alongside Base
-- Callers fund whichever chain matches their wallet
-- Proxy checks correct contract before routing; agents are chain-unaware
+- Bearer tokens now support both EVM (EIP-712) and Solana (ed25519) signatures
+- Auto-detected by address format (`0x...` = EVM, base58 = Solana)
+- Solana callers authenticated via `@noble/ed25519`; balance read directly from Solana wallet USDC
+- Devnet USDC mint: `4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU`
+- **Pending**: Solana on-chain program for deposits (Phase 5.5); current check reads raw wallet balance
 
 ---
 
@@ -206,13 +208,22 @@ packages/proxy/
     router.ts             cheapest-provider selection
     forwarder.ts          HTTP forwarding + SSE passthrough
     billing.ts            usage extraction, cost logging
+    zktls.ts              Phase 3 — zkTLS proof queue + background worker
+    fingerprint.ts        Phase 4 — model fingerprinting + drift detection
     middleware/
-      auth.ts             EIP-712 token verify (viem)
-      balance.ts          USDC balance check (mocked)
+      auth.ts             EIP-712 (EVM) + ed25519 (Solana) token verify
+      balance.ts          USDC balance check — EVM contract or Solana wallet
     format/
       normalise.ts        Anthropic → OpenAI request
       translate.ts        OpenAI → Anthropic response
   test/                   bun test suite
+packages/contracts/
+  src/
+    PaypromptBalance.sol  Phase 2 — USDC deposit + 1% fee contract
+  script/
+    Deploy.s.sol          forge deploy script
+  test/
+    PaypromptBalance.t.sol  unit tests (forge)
 deploy/
   deploy.sh               one-command deploy from local machine
   payprompt-proxy.service systemd unit
