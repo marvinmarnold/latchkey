@@ -1,4 +1,4 @@
-# Colosseum LLM Marketplace — Proxy MVP Design
+# Payprompt LLM Marketplace — Proxy MVP Design
 **Date:** 2026-05-24
 **Status:** Approved
 

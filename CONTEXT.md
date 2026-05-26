@@ -1,4 +1,4 @@
-# Colosseum LLM Marketplace — Glossary
+# Payprompt LLM Marketplace — Glossary
 
 ## Marketplace
 A listing marketplace where independent Providers register their own inference endpoints and prices. The platform routes requests and handles billing but never holds upstream API keys. Providers compete on price (v1) and eventually on quality heuristics (v2).

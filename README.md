@@ -1,4 +1,4 @@
-# Colosseum LLM Marketplace — Proxy
+# Payprompt LLM Marketplace — Proxy
 
 An HTTP proxy that lets agents and developers call open-weight LLMs through a single endpoint, with wallet-based auth and per-request billing. Providers compete on price; the proxy routes to the cheapest available one.
 

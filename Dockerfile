@@ -15,7 +15,7 @@ RUN mkdir -p /app/data && chown -R bun:bun /app/data
 EXPOSE 3000
 
 ENV PORT=3000
-ENV DB_PATH=/app/data/colosseum.db
+ENV DB_PATH=/app/data/payprompt.db
 ENV NODE_ENV=production
 
 USER bun
