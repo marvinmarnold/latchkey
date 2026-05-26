@@ -4,3 +4,8 @@
 *.db-wal
 .env
 node_modules/
+
+# Foundry
+packages/contracts/cache/
+packages/contracts/out/
+packages/contracts/broadcast/*/dry-run/

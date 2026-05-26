@@ -11,12 +11,13 @@ export function computeCost(
   return Math.ceil((inputTokens * priceInput + outputTokens * priceOutput) / 1_000_000)
 }
 
-export function logUsage(db: Database, record: UsageRecord): number {
+export function logUsage(db: Database, record: UsageRecord): { id: string; costUsdc: number } {
+  const id = randomUUID()
   db.run(
     `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      randomUUID(),
+      id,
       record.callerAddress,
       record.listingId,
       record.modelId,
@@ -26,7 +27,7 @@ export function logUsage(db: Database, record: UsageRecord): number {
       Math.floor(Date.now() / 1000),
     ],
   )
-  return record.costUsdc
+  return { id, costUsdc: record.costUsdc }
 }
 
 type OAIUsage = { prompt_tokens: number; completion_tokens: number; total_tokens: number }
