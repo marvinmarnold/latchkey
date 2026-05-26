@@ -84,6 +84,29 @@ echo "==> Writing Caddy config and Cloudflare token"
 $SSH "cp $APP_DIR/deploy/Caddyfile /etc/caddy/Caddyfile"
 $SSH "printf 'CLOUDFLARE_API_TOKEN=%s\n' '${CLOUDFLARE_API_TOKEN:-}' > /etc/caddy/cloudflare.env && chmod 600 /etc/caddy/cloudflare.env"
 
+echo "==> Setting Cloudflare DNS A record api.latchkey.me → $HOST"
+CF_ZONE=$(curl -sf "https://api.cloudflare.com/client/v4/zones?name=latchkey.me" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN:-}" | \
+  python3 -c "import sys,json; print(json.load(sys.stdin)['result'][0]['id'])")
+
+CF_RECORD=$(curl -sf "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/dns_records?type=A&name=api.latchkey.me" \
+  -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN:-}" | \
+  python3 -c "import sys,json; r=json.load(sys.stdin)['result']; print(r[0]['id'] if r else '')")
+
+if [ -z "$CF_RECORD" ]; then
+  curl -sf -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/dns_records" \
+    -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN:-}" \
+    -H "Content-Type: application/json" \
+    -d "{\"type\":\"A\",\"name\":\"api.latchkey.me\",\"content\":\"$HOST\",\"proxied\":false}" > /dev/null
+  echo "    Created"
+else
+  curl -sf -X PATCH "https://api.cloudflare.com/client/v4/zones/$CF_ZONE/dns_records/$CF_RECORD" \
+    -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN:-}" \
+    -H "Content-Type: application/json" \
+    -d "{\"content\":\"$HOST\",\"proxied\":false}" > /dev/null
+  echo "    Updated"
+fi
+
 echo "==> Starting services"
 $SSH "systemctl restart payprompt-proxy caddy"
 
