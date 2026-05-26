@@ -11,8 +11,8 @@ beforeEach(() => {
 afterEach(() => closeDb(db))
 
 describe('logUsage', () => {
-  it('inserts a billing_log row and returns cost', () => {
-    const cost = logUsage(db, {
+  it('inserts a billing_log row and returns id + cost', () => {
+    const result = logUsage(db, {
       callerAddress: '0xabc',
       listingId: 'twoshoes-deepseek',
       modelId: 'deepseek-chat',
@@ -20,7 +20,8 @@ describe('logUsage', () => {
       outputTokens: 1_000_000,
       costUsdc: 1370,
     })
-    expect(cost).toBe(1370)
+    expect(result.costUsdc).toBe(1370)
+    expect(typeof result.id).toBe('string')
     const row = db.query('SELECT * FROM billing_log').get() as { input_tokens: number }
     expect(row.input_tokens).toBe(1_000_000)
   })

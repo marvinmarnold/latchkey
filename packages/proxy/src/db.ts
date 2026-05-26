@@ -55,6 +55,33 @@ export function openDb(path: string = process.env.DB_PATH ?? './payprompt.db'): 
     )
   `)
 
+  // Phase 3: zkTLS proof queue — jobs enqueued after each request, processed async
+  // Status: 'pending' | 'submitted' | 'verified' | 'failed'
+  db.run(`
+    CREATE TABLE IF NOT EXISTS tls_proof_queue (
+      id              TEXT PRIMARY KEY,
+      billing_log_id  TEXT NOT NULL,
+      caller_address  TEXT NOT NULL,
+      provider_host   TEXT NOT NULL,
+      input_tokens    INTEGER NOT NULL,
+      output_tokens   INTEGER NOT NULL,
+      status          TEXT NOT NULL DEFAULT 'pending',
+      created_at      INTEGER NOT NULL,
+      updated_at      INTEGER NOT NULL
+    )
+  `)
+
+  // Phase 4: model fingerprints recorded at provider onboarding
+  db.run(`
+    CREATE TABLE IF NOT EXISTS model_fingerprints (
+      id            TEXT PRIMARY KEY,
+      listing_id    TEXT NOT NULL,
+      prompt_hash   TEXT NOT NULL,
+      response_hash TEXT NOT NULL,
+      recorded_at   INTEGER NOT NULL
+    )
+  `)
+
   return db
 }
 
