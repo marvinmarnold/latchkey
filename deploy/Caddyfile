@@ -1,5 +1,11 @@
-# Replace proxy.yourdomain.com with your actual domain before deploying.
-# Caddy handles HTTPS automatically via Let's Encrypt.
-proxy.yourdomain.com {
+{
+    email admin@latchkey.me
+}
+
+api.latchkey.me {
     reverse_proxy localhost:3000
+
+    tls {
+        dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+    }
 }
