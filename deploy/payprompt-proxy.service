@@ -1,15 +1,14 @@
 [Unit]
-Description=Colosseum LLM Proxy
+Description=Payprompt Proxy
 After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/colosseum
-ExecStart=/home/ubuntu/.bun/bin/bun run packages/proxy/src/index.ts
+WorkingDirectory=/root/payprompt
+ExecStart=/root/.bun/bin/bun run packages/proxy/src/index.ts
+EnvironmentFile=/root/payprompt/packages/proxy/.env
 Restart=always
 RestartSec=5
-EnvironmentFile=/home/ubuntu/colosseum/packages/proxy/.env
 StandardOutput=journal
 StandardError=journal
 
