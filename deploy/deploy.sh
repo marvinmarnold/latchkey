@@ -15,7 +15,6 @@ fi
 HOST="${DEPLOY_HOST:?DEPLOY_HOST env var required}"
 DEPLOY_USER="${DEPLOY_USER:?DEPLOY_USER env var required}"
 APP_DIR="/root/payprompt"
-REPO="https://github.com/marvinmarnold/payprompt.git"
 
 PASS="${DEPLOY_PASSWORD:?DEPLOY_PASSWORD env var required}"
 
@@ -45,6 +44,14 @@ if [ ! -f "$HOME/.bun/bin/bun" ]; then
 fi
 export PATH="$HOME/.bun/bin:$PATH"
 
+echo "--- install Caddy with Cloudflare DNS plugin"
+if [ ! -f /usr/local/bin/caddy ]; then
+  curl -fsSL "https://caddyserver.com/api/download?os=linux&arch=amd64&p=github.com%2Fcaddy-dns%2Fcloudflare" \
+    -o /usr/local/bin/caddy
+  chmod +x /usr/local/bin/caddy
+fi
+mkdir -p /etc/caddy
+
 echo "--- clone or pull repo"
 if [ -d /root/payprompt/.git ]; then
   git -C /root/payprompt pull
@@ -56,10 +63,11 @@ echo "--- install dependencies"
 cd /root/payprompt
 "$HOME/.bun/bin/bun" install --frozen-lockfile
 
-echo "--- install systemd service"
+echo "--- install systemd services"
 cp /root/payprompt/deploy/payprompt-proxy.service /etc/systemd/system/
+cp /root/payprompt/deploy/caddy.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable payprompt-proxy
+systemctl enable payprompt-proxy caddy
 SETUP
 
 echo "==> Writing .env"
@@ -72,9 +80,13 @@ DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 OPENAI_API_KEY=${OPENAI_API_KEY:-}
 ENV
 
-echo "==> Starting service"
-$SSH "systemctl restart payprompt-proxy"
+echo "==> Writing Caddy config and Cloudflare token"
+$SSH "cp $APP_DIR/deploy/Caddyfile /etc/caddy/Caddyfile"
+$SSH "printf 'CLOUDFLARE_API_TOKEN=%s\n' '${CLOUDFLARE_API_TOKEN:-}' > /etc/caddy/cloudflare.env && chmod 600 /etc/caddy/cloudflare.env"
+
+echo "==> Starting services"
+$SSH "systemctl restart payprompt-proxy caddy"
 
 echo ""
-echo "✅ Deployed. Test:"
-echo "   curl http://$HOST:3000/health"
+echo "✅ Deployed."
+echo "   https://api.latchkey.me/health"

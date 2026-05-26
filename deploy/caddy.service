@@ -1,0 +1,14 @@
+[Unit]
+Description=Caddy
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/caddy run --config /etc/caddy/Caddyfile
+ExecReload=/usr/local/bin/caddy reload --config /etc/caddy/Caddyfile
+EnvironmentFile=/etc/caddy/cloudflare.env
+TimeoutStopSec=5s
+LimitNOFILE=1048576
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
