@@ -2,5 +2,8 @@
   "name": "payprompt",
   "version": "0.0.1",
   "private": true,
-  "workspaces": ["packages/*"]
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "deploy": "bash deploy/deploy.sh"
+  }
 }
