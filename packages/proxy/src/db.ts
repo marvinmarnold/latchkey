@@ -67,9 +67,10 @@ export function seedProviders(db: Database): void {
   db.run(`INSERT OR IGNORE INTO providers (id, name) VALUES (?, ?)`, ['twoshoes', 'TwoShoes'])
 
   db.run(
-    `INSERT OR IGNORE INTO listings
+    `INSERT INTO listings
        (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
     [
       'twoshoes-anthropic',
       'twoshoes',
@@ -91,18 +92,20 @@ export function seedProviders(db: Database): void {
   ]
   for (const [modelId, providerModelId, id] of deepseekAliases) {
     db.run(
-      `INSERT OR IGNORE INTO listings
+      `INSERT INTO listings
          (id, provider_id, model_id, provider_model_id, upstream_format, endpoint, api_key, price_input, price_output)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
       [id, 'twoshoes', modelId, providerModelId, 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
     )
   }
 
   // Prefix catch-all for deepseek- native API names (e.g. deepseek-v4-pro sent directly)
   db.run(
-    `INSERT OR IGNORE INTO listings
+    `INSERT INTO listings
        (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
     ['twoshoes-deepseek', 'twoshoes', 'deepseek-', 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
   )
 
@@ -110,9 +113,10 @@ export function seedProviders(db: Database): void {
   db.run(`INSERT OR IGNORE INTO providers (id, name) VALUES (?, ?)`, ['bigthought', 'BigThought'])
 
   db.run(
-    `INSERT OR IGNORE INTO listings
+    `INSERT INTO listings
        (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
     [
       'bigthought-gpt',
       'bigthought',
@@ -128,9 +132,10 @@ export function seedProviders(db: Database): void {
   const oModels = ['o1', 'o1-mini', 'o1-pro', 'o3', 'o3-mini', 'o4-mini']
   for (const model of oModels) {
     db.run(
-      `INSERT OR IGNORE INTO listings
+      `INSERT INTO listings
          (id, provider_id, model_id, upstream_format, endpoint, api_key, price_input, price_output)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
       [
         `bigthought-${model}`,
         'bigthought',
