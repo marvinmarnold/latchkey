@@ -7,6 +7,7 @@ import { normaliseAnthropicToOpenAI } from './format/normalise'
 import { translateOpenAIToAnthropic, openAIStreamToAnthropicStream } from './format/translate'
 import { selectListing, penaliseListing } from './router'
 import { forwardToProvider } from './forwarder'
+import { discoverModels } from './discovery'
 import { extractUsageFromStream, computeCost, logUsage } from './billing'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
@@ -90,6 +91,7 @@ export function buildApp(db: Database) {
 if (import.meta.main) {
   const db = openDb()
   seedProviders(db)
+  await discoverModels(db)
   const PORT = Number(process.env.PORT ?? 3000)
   buildApp(db).listen(PORT)
   console.log(`Payprompt proxy running on http://localhost:${PORT}`)
