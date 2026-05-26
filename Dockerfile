@@ -4,7 +4,7 @@ WORKDIR /app
 # Install dependencies — separate layer so it caches unless lockfile changes
 COPY package.json bun.lock ./
 COPY packages/proxy/package.json ./packages/proxy/
-RUN bun install --frozen-lockfile --production
+RUN bun install --production
 
 # Copy source
 COPY packages/proxy/src ./packages/proxy/src
