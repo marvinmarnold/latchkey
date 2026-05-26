@@ -1,6 +1,7 @@
 // packages/proxy/src/middleware/auth.ts
 import { recoverTypedDataAddress } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
+import { randomBytes } from 'crypto'
 import type { BearerToken } from '../types'
 
 export const DOMAIN = {
@@ -57,7 +58,7 @@ export async function encodeBearerToken(
   expiry: number = Math.floor(Date.now() / 1000) + 3600,
 ): Promise<string> {
   const account = privateKeyToAccount(privateKey)
-  const nonce = Math.random().toString(36).slice(2)
+  const nonce = randomBytes(16).toString('hex')
 
   const sig = await account.signTypedData({
     domain: DOMAIN,
