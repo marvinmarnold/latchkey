@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Deploy payprompt proxy to a fresh Ubuntu VPS via SSH password auth.
-# Usage: DEPLOY_PASSWORD=xxx ANTHROPIC_API_KEY=xxx DEEPSEEK_API_KEY=xxx OPENAI_API_KEY=xxx bash deploy/deploy.sh
+# Usage: DEPLOY_HOST=1.2.3.4 DEPLOY_USER=root DEPLOY_PASSWORD=xxx ANTHROPIC_API_KEY=xxx DEEPSEEK_API_KEY=xxx OPENAI_API_KEY=xxx bash deploy/deploy.sh
 set -euo pipefail
 
-HOST="151.247.22.152"
-DEPLOY_USER="root"
+HOST="${DEPLOY_HOST:?DEPLOY_HOST env var required}"
+DEPLOY_USER="${DEPLOY_USER:?DEPLOY_USER env var required}"
 APP_DIR="/root/payprompt"
 REPO="https://github.com/marvinmarnold/payprompt.git"
 
