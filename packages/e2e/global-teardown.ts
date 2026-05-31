@@ -14,4 +14,6 @@ export default async function globalTeardown() {
 
   const dbPath = path.join(__dirname, 'test.db')
   if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath)
+  const tokenPath = path.join(__dirname, '.e2e-token')
+  if (fs.existsSync(tokenPath)) fs.unlinkSync(tokenPath)
 }

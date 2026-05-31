@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test'
+import * as fs from 'fs'
+import * as path from 'path'
 
 const PROXY_URL = process.env.E2E_PROXY_URL ?? 'http://localhost:3002'
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? 'http://localhost:3001'
@@ -9,6 +11,10 @@ const IS_PRODUCTION = !!(process.env.E2E_PROXY_URL && process.env.E2E_ADMIN_URL)
 
 // The wallet used in local E2E (matches TEST_PRIVATE_KEY in packages/proxy/.env)
 const TEST_WALLET = '0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89'
+
+// Production billing smoke test: E2E_BEARER_TOKEN must be pre-generated and passed in.
+// Local: global-setup already runs the smoke test before Playwright starts.
+const BEARER_TOKEN = process.env.E2E_BEARER_TOKEN ?? ''
 
 // ---------------------------------------------------------------------------
 // API contract tests — /admin/usage endpoint
@@ -132,5 +138,53 @@ test.describe('Admin dashboard UI', () => {
         expect(/0x[0-9a-fA-F]{4}…/.test(text)).toBe(true)
       }
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Full billing loop smoke test
+// Verifies: real request → proxy logs billing → /admin/usage reflects it.
+// Local:      always runs (global-setup already made the request; this checks
+//             the result that persisted into the running proxy's DB).
+// Production: runs only when E2E_BEARER_TOKEN is provided.
+// ---------------------------------------------------------------------------
+
+test.describe('Billing loop', () => {
+  test('a proxied request appears in /admin/usage', async ({ request }) => {
+    test.skip(IS_PRODUCTION && !BEARER_TOKEN, 'set E2E_BEARER_TOKEN to run billing smoke test against production')
+
+    // Resolve the bearer token: env var (production) or temp file written by global-setup (local)
+    const tokenFile = path.join(__dirname, '..', '.e2e-token')
+    const token = BEARER_TOKEN || (fs.existsSync(tokenFile) ? fs.readFileSync(tokenFile, 'utf8').trim() : '')
+    if (!token) throw new Error('No bearer token available for billing loop test')
+
+    // Snapshot current total for the test wallet
+    const before = await request.get(`${PROXY_URL}/admin/usage`)
+    const beforeData = await before.json() as { byWallet: Array<{ key: string; tokens: number }> }
+    const tokensBefore = beforeData.byWallet
+      .filter(r => r.key.toLowerCase() === TEST_WALLET.toLowerCase())
+      .reduce((s, r) => s + r.tokens, 0)
+
+    // Make a real request through the proxy
+    const proxyRes = await request.post(`${PROXY_URL}/v1/messages`, {
+      headers: { 'Content-Type': 'application/json', 'x-api-key': token },
+      data: { model: IS_PRODUCTION ? 'claude-haiku-4-5-20251001' : 'e2e-test-model', max_tokens: 5, messages: [{ role: 'user', content: 'hi' }] },
+    })
+    expect(proxyRes.status()).toBe(200)
+
+    // Poll /admin/usage until the wallet's token count increases (up to 10 s)
+    const deadline = Date.now() + 10000
+    let tokensAfter = tokensBefore
+    while (Date.now() < deadline) {
+      const after = await request.get(`${PROXY_URL}/admin/usage`)
+      const afterData = await after.json() as { byWallet: Array<{ key: string; tokens: number }> }
+      tokensAfter = afterData.byWallet
+        .filter(r => r.key.toLowerCase() === TEST_WALLET.toLowerCase())
+        .reduce((s, r) => s + r.tokens, 0)
+      if (tokensAfter > tokensBefore) break
+      await new Promise(r => setTimeout(r, 500))
+    }
+
+    expect(tokensAfter).toBeGreaterThan(tokensBefore)
   })
 })
