@@ -4,8 +4,11 @@ const PROXY_URL = process.env.E2E_PROXY_URL ?? 'http://localhost:3002'
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? 'http://localhost:3001'
 
 // Are we hitting a live production environment? If so, skip tests that assert
-// specific seeded values — production has real (different) data.
+// specific local test data — production has real (different) data.
 const IS_PRODUCTION = !!(process.env.E2E_PROXY_URL && process.env.E2E_ADMIN_URL)
+
+// The wallet used in local E2E (matches TEST_PRIVATE_KEY in packages/proxy/.env)
+const TEST_WALLET = '0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89'
 
 // ---------------------------------------------------------------------------
 // API contract tests — /admin/usage endpoint
@@ -43,48 +46,37 @@ test.describe('GET /admin/usage', () => {
     }
   })
 
-  // --- Local-only tests: assert specific seeded values ---
+  // --- Local-only tests: assert specific values from the phase 1 smoke request ---
 
-  test('seeded billing data is present in byWallet', async ({ request }) => {
-    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
+  test('phase 1 smoke request appears in byWallet', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'local test wallet not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byWallet } = await res.json() as { byWallet: Array<{ date: string; key: string; tokens: number }> }
 
-    const walletRows = byWallet.filter(r => r.key.toLowerCase().startsWith('0xe2etest'))
-    expect(walletRows.length).toBeGreaterThan(0)
-    expect(walletRows.every(r => r.tokens > 0)).toBe(true)
-    expect(walletRows.every(r => /^\d{4}-\d{2}-\d{2}$/.test(r.date))).toBe(true)
+    const row = byWallet.find(r => r.key.toLowerCase() === TEST_WALLET.toLowerCase())
+    expect(row).toBeDefined()
+    expect(row?.tokens).toBeGreaterThan(0)
+    expect(row?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 
-  test('seeded billing data is present in byProvider', async ({ request }) => {
-    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
+  test('phase 1 smoke request appears in byProvider', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'local test provider not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byProvider } = await res.json() as { byProvider: Array<{ date: string; key: string; tokens: number }> }
 
-    const twoShoesRows = byProvider.filter(r => r.key === 'TwoShoes')
-    expect(twoShoesRows.length).toBeGreaterThan(0)
+    const row = byProvider.find(r => r.key === 'E2EProvider')
+    expect(row).toBeDefined()
+    expect(row?.tokens).toBeGreaterThan(0)
   })
 
-  test('seeded billing data is present in byModel', async ({ request }) => {
-    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
+  test('phase 1 smoke request appears in byModel', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'local test model not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byModel } = await res.json() as { byModel: Array<{ date: string; key: string; tokens: number }> }
 
-    const claudeRows = byModel.filter(r => r.key === 'claude-sonnet-4-6')
-    expect(claudeRows.length).toBeGreaterThan(0)
-
-    const totalTokens = claudeRows.reduce((sum, r) => sum + r.tokens, 0)
-    expect(totalTokens).toBe(2800) // seeded: 1200+480 + 800+320
-  })
-
-  test('token counts are sums of input + output', async ({ request }) => {
-    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
-    const res = await request.get(`${PROXY_URL}/admin/usage`)
-    const { byModel } = await res.json() as { byModel: Array<{ date: string; key: string; tokens: number }> }
-
-    const dsRow = byModel.find(r => r.key === 'deepseek-ai/DeepSeek-V3')
-    expect(dsRow).toBeDefined()
-    expect(dsRow?.tokens).toBe(700) // seeded: 500 + 200
+    const row = byModel.find(r => r.key === 'e2e-test-model')
+    expect(row).toBeDefined()
+    expect(row?.tokens).toBe(15) // mock upstream returns prompt_tokens:10 + completion_tokens:5
   })
 })
 
@@ -95,24 +87,19 @@ test.describe('GET /admin/usage', () => {
 test.describe('Admin dashboard UI', () => {
   test('page title is correct', async ({ page }) => {
     await page.goto(ADMIN_URL)
-    await expect(page).toHaveTitle('Payprompt Admin')
+    await expect(page).toHaveTitle('Latchkey Admin')
   })
 
   test('shows the heading', async ({ page }) => {
     await page.goto(ADMIN_URL)
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Payprompt Usage')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Latchkey Usage')
   })
 
   test('renders three chart sections after data loads', async ({ page }) => {
     await page.goto(ADMIN_URL)
-
-    // Wait for data to load (Loading... disappears)
     await expect(page.getByText('Loading…')).not.toBeVisible({ timeout: 10000 })
-
-    // Verify no error message
     await expect(page.getByText(/Failed to load/)).not.toBeVisible()
 
-    // Three chart titles should be present
     await expect(page.getByRole('heading', { level: 2, name: 'Tokens by Wallet' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'Tokens by Provider' })).toBeVisible()
     await expect(page.getByRole('heading', { level: 2, name: 'Tokens by Model' })).toBeVisible()
@@ -122,7 +109,6 @@ test.describe('Admin dashboard UI', () => {
     await page.goto(ADMIN_URL)
     await expect(page.getByText('Loading…')).not.toBeVisible({ timeout: 10000 })
 
-    // Recharts renders SVG elements
     const svgCount = await page.locator('svg.recharts-surface').count()
     expect(svgCount).toBeGreaterThanOrEqual(3)
   })
@@ -134,19 +120,17 @@ test.describe('Admin dashboard UI', () => {
     const legend = page.locator('.recharts-legend-wrapper').first()
     const text = await legend.textContent() ?? ''
 
-    // If there are 0x wallet addresses, they must be truncated (≤ 14 chars: "0x1234…5678")
-    const rawEvmPattern = /0x[0-9a-fA-F]{10,}/  // un-truncated EVM address
+    // Un-truncated EVM addresses must not appear
+    const rawEvmPattern = /0x[0-9a-fA-F]{10,}/
     expect(rawEvmPattern.test(text)).toBe(false)
 
-    if (IS_PRODUCTION) {
-      // Production has real wallets — just verify the truncation format for any 0x address shown
-      const truncatedPattern = /0x[0-9a-fA-F]{4}…/
-      if (text.includes('0x')) {
-        expect(truncatedPattern.test(text)).toBe(true)
-      }
+    if (!IS_PRODUCTION) {
+      // Local: the test wallet 0xe65710... should appear truncated as 0xe657…Eb89
+      expect(text).toContain('0xe657')
     } else {
-      // Local: our seeded wallet 0xE2eTestWallet... should appear truncated
-      expect(text).toContain('0xE2eT')
+      if (text.includes('0x')) {
+        expect(/0x[0-9a-fA-F]{4}…/.test(text)).toBe(true)
+      }
     }
   })
 })

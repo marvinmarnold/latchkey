@@ -1,6 +1,6 @@
 import { Database } from 'bun:sqlite'
 
-export function openDb(path: string = process.env.DB_PATH ?? './payprompt.db'): Database {
+export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): Database {
   const db = new Database(path, { create: true })
   db.run('PRAGMA journal_mode = WAL')
 

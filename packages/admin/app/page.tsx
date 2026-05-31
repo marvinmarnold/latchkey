@@ -27,7 +27,7 @@ export default function AdminPage() {
   return (
     <main>
       <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '2.5rem' }}>
-        Payprompt Usage — last 30 days
+        Latchkey Usage — last 30 days
       </h1>
 
       {error && (

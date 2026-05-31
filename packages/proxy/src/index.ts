@@ -106,7 +106,7 @@ if (import.meta.main) {
   seedProviders(db)
   const PORT = Number(process.env.PORT ?? 3000)
   const server = buildApp(db).listen(PORT)
-  console.log(`Payprompt proxy running on http://localhost:${PORT}`)
+  console.log(`Latchkey proxy running on http://localhost:${PORT}`)
   // Discover models in the background — don't block accepting traffic
   discoverModels(db).then(
     () => console.log('[discovery] complete'),
