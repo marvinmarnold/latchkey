@@ -15,13 +15,18 @@ export default function AdminPage() {
 
   useEffect(() => {
     const url = `${process.env.NEXT_PUBLIC_PROXY_URL ?? 'http://localhost:3000'}/admin/usage`
-    fetch(url)
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        return r.json() as Promise<UsageData>
-      })
-      .then(setData)
-      .catch((e: Error) => setError(e.message))
+    const load = () => {
+      fetch(url)
+        .then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`)
+          return r.json() as Promise<UsageData>
+        })
+        .then(setData)
+        .catch((e: Error) => setError(e.message))
+    }
+    load()
+    const interval = setInterval(load, 30000) // refresh every 30s
+    return () => clearInterval(interval)
   }, [])
 
   return (
