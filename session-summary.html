@@ -47,6 +47,8 @@
 <h1>Latchkey — Session Summary <span class="badge green">✓ Complete</span></h1>
 <p class="subtitle">2026-05-31 · branch <code>ma/3</code> · proxy <a href="https://api.latchkey.me/health">api.latchkey.me</a> · admin <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></p>
 
+<div class="ok">✓ Root cause found and fixed: server <code>.env</code> had stale <code>BALANCE_CONTRACT_ADDRESS</code> set, so requests returned 402 before reaching billing. Cleared on server. E2E billing loop test now catches this — it makes a real POST and polls <code>/admin/usage</code> until the token count increases.</div>
+
 <!-- ─── WHAT WAS DONE ──────────────────────────────────────────────────── -->
 <h2>What was done</h2>
 
@@ -106,7 +108,7 @@ claude</pre>
 <p>Send any message. You should get a normal response. Your wallet <code>0xe65710…</code> will appear in the admin dashboard.</p>
 
 <h3>2. Check the admin dashboard</h3>
-<p>Open <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> — three line charts should show token usage by wallet, provider, and model.</p>
+<p>Open <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> — three line charts should show token usage by wallet, provider, and model. <strong>Reload the page</strong> to pick up new data (it fetches on mount, no auto-refresh).</p>
 
 <h3>3. Smoke-test the proxy directly</h3>
 <pre>curl https://api.latchkey.me/health
@@ -152,9 +154,10 @@ process.stdout.write(t)
 <p>Paste the output as <code>ANTHROPIC_API_KEY</code> in <code>.env.client</code>.</p>
 
 <h3>6. Redeploy after code changes</h3>
-<pre><span class="comment"># Proxy:</span>
+<pre><span class="comment"># Proxy (code + env together):</span>
 ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 \
   "cd /root/latchkey && git pull origin ma/3 && bun install --frozen-lockfile && systemctl restart latchkey-proxy"
+bash deploy/sync-env.sh   <span class="comment"># always sync .env after a deploy to avoid stale values</span>
 
 <span class="comment"># Admin dashboard:</span>
 cd packages/admin && vercel --prod --yes</pre>
