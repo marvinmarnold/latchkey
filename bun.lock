@@ -6,7 +6,7 @@
       "name": "colosseum",
     },
     "packages/admin": {
-      "name": "@payprompt/admin",
+      "name": "@latchkey/admin",
       "version": "0.0.1",
       "dependencies": {
         "next": "^15.0.0",
@@ -22,7 +22,7 @@
       },
     },
     "packages/e2e": {
-      "name": "@payprompt/e2e",
+      "name": "@latchkey/e2e",
       "version": "0.0.1",
       "devDependencies": {
         "@playwright/test": "^1.50.0",
@@ -30,7 +30,7 @@
       },
     },
     "packages/proxy": {
-      "name": "@payprompt/proxy",
+      "name": "@latchkey/proxy",
       "version": "0.0.1",
       "dependencies": {
         "@noble/ed25519": "^3.1.0",
@@ -103,6 +103,12 @@
 
     "@img/sharp-win32-x64": ["@img/sharp-win32-x64@0.34.5", "", { "os": "win32", "cpu": "x64" }, "sha512-+29YMsqY2/9eFEiW93eqWnuLcWcufowXewwSNIT6UwZdUUCrM3oFjMWH/Z6/TMmb4hlFenmfAVbpWeup2jryCw=="],
 
+    "@latchkey/admin": ["@latchkey/admin@workspace:packages/admin"],
+
+    "@latchkey/e2e": ["@latchkey/e2e@workspace:packages/e2e"],
+
+    "@latchkey/proxy": ["@latchkey/proxy@workspace:packages/proxy"],
+
     "@next/env": ["@next/env@15.5.18", "", {}, "sha512-hAV85Ckd9QR6RvH04MEKwsfLTksvFpO47j9xwtoIuvuPnlwecpSi+uZTtm8HirVbtlI2Fnz//xpcSTjFdyJk+g=="],
 
     "@next/swc-darwin-arm64": ["@next/swc-darwin-arm64@15.5.18", "", { "os": "darwin", "cpu": "arm64" }, "sha512-w0WvQf1n+txiwns/9pwIQteCJpZTbxzO2SE0FLcwuD4v0WEh1JPOjdyxWL21XwJsdpx8cFRjyzxzCS/siP7HcQ=="],
@@ -128,12 +134,6 @@
     "@noble/ed25519": ["@noble/ed25519@3.1.0", "", {}, "sha512-pfcObRY3CtvwfaG9Mt5XqZdKmAQppl37tHUeuBhDUbiwJBCVY4/A4lbMvb1xKhMDx96AqAqZpMWuBX1HulhX4g=="],
 
     "@noble/hashes": ["@noble/hashes@1.8.0", "", {}, "sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A=="],
-
-    "@payprompt/admin": ["@payprompt/admin@workspace:packages/admin"],
-
-    "@payprompt/e2e": ["@payprompt/e2e@workspace:packages/e2e"],
-
-    "@payprompt/proxy": ["@payprompt/proxy@workspace:packages/proxy"],
 
     "@playwright/test": ["@playwright/test@1.60.0", "", { "dependencies": { "playwright": "1.60.0" }, "bin": { "playwright": "cli.js" } }, "sha512-O71yZIbAh/PxDMNGns37GHBIfrVkEVyn+AXyIa5dOTfb4/xNvRWV+Vv/NMbNCtODB/pO7vLlF2OTmMVLhmr7Ag=="],
 
