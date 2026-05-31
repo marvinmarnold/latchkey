@@ -6,7 +6,7 @@ import bs58 from 'bs58'
 import type { BearerToken } from '../types'
 
 export const DOMAIN = {
-  name: 'Payprompt LLM Marketplace',
+  name: 'Latchkey LLM Marketplace',
   version: '1',
   chainId: 8453,
 } as const
@@ -33,7 +33,7 @@ function isSolanaAddress(addr: string): boolean {
 /** Canonical message bytes for Solana tokens (signed with ed25519) */
 function solanaSigningPayload(address: string, expiry: number, nonce: string): Uint8Array {
   return new TextEncoder().encode(
-    `payprompt:${address}:${expiry}:${nonce}`,
+    `latchkey:${address}:${expiry}:${nonce}`,
   )
 }
 

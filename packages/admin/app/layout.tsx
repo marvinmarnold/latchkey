@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Payprompt Admin' }
+export const metadata: Metadata = { title: 'Latchkey Admin' }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

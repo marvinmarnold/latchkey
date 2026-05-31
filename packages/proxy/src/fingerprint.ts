@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'crypto'
 
 // Deterministic probe: same prompt → same (or very similar) response from a given model.
 // We hash the response to detect model swap (bait-and-switch).
-const PROBE_PROMPT = 'Respond with exactly this text and nothing else: payprompt-fingerprint-v1'
+const PROBE_PROMPT = 'Respond with exactly this text and nothing else: latchkey-fingerprint-v1'
 const PROBE_HASH = createHash('sha256').update(PROBE_PROMPT).digest('hex')
 
 interface Listing {
