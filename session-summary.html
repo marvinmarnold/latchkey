@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Latchkey — Session Summary</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e5e5e5; padding: 2rem; line-height: 1.6; max-width: 860px; }
+  h1 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.25rem; color: #fff; }
+  .subtitle { color: #737373; font-size: 0.875rem; margin-bottom: 2.5rem; }
+  h2 { font-size: 1rem; font-weight: 600; color: #a3a3a3; margin: 2rem 0 0.75rem; border-bottom: 1px solid #262626; padding-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; }
+  h3 { font-size: 0.9rem; font-weight: 600; color: #e5e5e5; margin: 1.25rem 0 0.4rem; }
+  p, li { font-size: 0.875rem; color: #d4d4d4; }
+  ul { padding-left: 1.25rem; }
+  li { margin-bottom: 0.3rem; }
+  code { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.78rem; background: #1c1c1c; border: 1px solid #2a2a2a; padding: 0.1rem 0.4rem; border-radius: 4px; color: #a5f3fc; }
+  pre { font-family: 'SF Mono', 'Fira Mono', monospace; font-size: 0.78rem; background: #141414; border: 1px solid #262626; padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; margin: 0.6rem 0 1rem; color: #e5e5e5; line-height: 1.6; }
+  pre .comment { color: #525252; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin: 0.75rem 0 1rem; }
+  .card { background: #141414; border: 1px solid #262626; border-radius: 8px; padding: 0.9rem 1rem; }
+  .card .label { font-size: 0.68rem; color: #525252; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.35rem; }
+  .card .value { font-family: 'SF Mono', monospace; font-size: 0.78rem; color: #a5f3fc; word-break: break-all; }
+  .badge { display: inline-block; font-size: 0.68rem; padding: 0.15rem 0.55rem; border-radius: 99px; font-weight: 600; vertical-align: middle; margin-left: 0.4rem; }
+  .green  { background: #14532d; color: #86efac; }
+  .yellow { background: #422006; color: #fcd34d; }
+  .red    { background: #450a0a; color: #fca5a5; }
+  .blue   { background: #1e3a5f; color: #93c5fd; }
+  .step { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; }
+  .step-num { flex-shrink: 0; width: 1.6rem; height: 1.6rem; background: #1c1c1c; border: 1px solid #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; color: #737373; margin-top: 0.15rem; }
+  .step-body { flex: 1; }
+  .step-body p { margin-top: 0.3rem; }
+  a { color: #6366f1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .warn { background: #2c1503; border: 1px solid #78350f; border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.82rem; color: #fcd34d; margin: 0.75rem 0 1rem; }
+  .note { background: #0c1a2e; border: 1px solid #1e3a5f; border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.82rem; color: #93c5fd; margin: 0.75rem 0 1rem; }
+  .ok   { background: #052e16; border: 1px solid #14532d; border-radius: 8px; padding: 0.85rem 1rem; font-size: 0.82rem; color: #86efac; margin: 0.75rem 0 1rem; }
+  .divider { border: none; border-top: 1px solid #1a1a1a; margin: 2rem 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.75rem 0 1rem; }
+  th { text-align: left; padding: 0.4rem 0.75rem; color: #525252; font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #262626; }
+  td { padding: 0.45rem 0.75rem; border-bottom: 1px solid #1a1a1a; color: #d4d4d4; }
+  tr:last-child td { border-bottom: none; }
+  .mono { font-family: 'SF Mono', monospace; font-size: 0.78rem; color: #a5f3fc; }
+</style>
+</head>
+<body>
+
+<h1>Latchkey — Session Summary <span class="badge green">✓ Complete</span></h1>
+<p class="subtitle">2026-05-31 · branch <code>ma/3</code> · proxy <a href="https://api.latchkey.me/health">api.latchkey.me</a> · admin <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></p>
+
+<!-- ─── WHAT WAS DONE ──────────────────────────────────────────────────── -->
+<h2>What was done</h2>
+
+<h3>Rename payprompt → latchkey</h3>
+<ul>
+  <li>All source strings, package names (<code>@latchkey/proxy</code>, <code>@latchkey/admin</code>, <code>@latchkey/e2e</code>)</li>
+  <li>DB file: <code>latchkey.db</code>, startup log, EIP-712 domain name (<code>Latchkey LLM Marketplace</code>), Solana signing prefix</li>
+  <li>New systemd service <code>latchkey-proxy</code>; old <code>payprompt-proxy</code> disabled on server</li>
+  <li>Server directory migrated: <code>/root/payprompt</code> → <code>/root/latchkey</code></li>
+</ul>
+
+<h3>Admin dashboard (new)</h3>
+<ul>
+  <li><code>packages/proxy/src/admin.ts</code> — <code>queryUsage()</code>, 30-day aggregation by wallet / provider / model</li>
+  <li><code>GET /admin/usage</code> on proxy, open CORS</li>
+  <li><code>packages/admin/</code> — Next.js 15 + Recharts, deployed to Vercel</li>
+</ul>
+
+<h3>E2E test spec (new)</h3>
+<ul>
+  <li>11 Playwright tests in <code>packages/e2e/tests/admin-dashboard.spec.ts</code></li>
+  <li>Global setup generates a real bearer token from <code>TEST_PRIVATE_KEY</code>, makes a live <code>POST /v1/chat/completions</code> through a mock upstream, and asserts the resulting billing entry appears in <code>/admin/usage</code> — proves the full phase 1 loop: auth → routing → billing → dashboard</li>
+</ul>
+
+<h3>Solana auth disabled <span class="badge red">security fix</span></h3>
+<ul>
+  <li>An unknown caller used a Solana-signed token to make a free request (same token counts as your EVM request, 15 s later — likely external scanner exploiting the empty balance check)</li>
+  <li><code>verifyBearerToken</code> now returns <code>401 Solana auth is not enabled (EVM only)</code> for any base58 address</li>
+  <li>Re-enable later by restoring the Solana branch in <code>middleware/auth.ts</code></li>
+</ul>
+
+<h3>Credentials</h3>
+<div class="grid2">
+  <div class="card"><div class="label">Private key</div><div class="value">0x6007ce7814ba19c6db28ed536e710ae7a10454d2f599356beaa6a71f91ffa7f1</div></div>
+  <div class="card"><div class="label">EVM wallet address</div><div class="value">0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89</div></div>
+  <div class="card"><div class="label">Token expires</div><div class="value">2026-06-30 (30 days)</div></div>
+  <div class="card"><div class="label">Credentials file</div><div class="value">.env.client (gitignored)</div></div>
+</div>
+
+<!-- ─── BILLING LOG ──────────────────────────────────────────────────────── -->
+<h2>Current billing log (production)</h2>
+<table>
+  <tr><th>Time</th><th>Wallet</th><th>Model</th><th>In</th><th>Out</th></tr>
+  <tr><td>May 31 ~00:30</td><td class="mono">0xe657…Eb89 (you)</td><td>claude-sonnet-4-6</td><td>298</td><td>11</td></tr>
+  <tr><td>May 31 ~00:30</td><td class="mono">0xe657…Eb89 (you)</td><td>claude-sonnet-4-6</td><td>3</td><td>26</td></tr>
+  <tr><td>May 31 ~01:34</td><td class="mono">0xe657…Eb89 (you)</td><td>claude-haiku-4-5-20251001</td><td>15</td><td>9</td></tr>
+  <tr><td>May 31 ~01:35</td><td class="mono" style="color:#fca5a5">9C6hy…Jtpj (unknown Solana)</td><td>claude-haiku-4-5-20251001</td><td>15</td><td>9</td></tr>
+</table>
+<div class="warn">⚠ The Solana entry came from an unknown external caller exploiting the empty balance check. Solana auth is now disabled. Consider adding a secret header or allowlist to block unauthenticated use until on-chain balance checks are live.</div>
+
+<!-- ─── HOW TO VERIFY ─────────────────────────────────────────────────────── -->
+<h2>How to verify yourself</h2>
+
+<h3>1. Use Claude Code through the proxy</h3>
+<pre>source .env.client    <span class="comment"># sets ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY</span>
+claude</pre>
+<p>Send any message. You should get a normal response. Your wallet <code>0xe65710…</code> will appear in the admin dashboard.</p>
+
+<h3>2. Check the admin dashboard</h3>
+<p>Open <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> — three line charts should show token usage by wallet, provider, and model.</p>
+
+<h3>3. Smoke-test the proxy directly</h3>
+<pre>curl https://api.latchkey.me/health
+<span class="comment"># → {"status":"ok","version":"0.1.0"}</span>
+
+curl https://api.latchkey.me/admin/usage
+<span class="comment"># → {"byWallet":[...],"byProvider":[...],"byModel":[...]}</span>
+
+<span class="comment"># Confirm Solana is blocked:</span>
+SOLANA_TOKEN="eyJhZGRyZXNzIjoiMkl... (any Solana token)"
+curl -H "Authorization: Bearer $SOLANA_TOKEN" https://api.latchkey.me/v1/chat/completions
+<span class="comment"># → 401 Solana auth is not enabled (EVM only)</span></pre>
+
+<h3>4. Run the E2E tests</h3>
+<div class="step">
+  <div class="step-num">A</div>
+  <div class="step-body">
+    <strong>Local</strong> — full 11 tests, spins up proxy + mock upstream + Next.js automatically:
+    <pre>cd packages/e2e && npx playwright test</pre>
+  </div>
+</div>
+<div class="step">
+  <div class="step-num">B</div>
+  <div class="step-body">
+    <strong>Production</strong> — 8 tests against live infra (3 local-data tests skipped):
+    <pre>cd packages/e2e \
+  E2E_PROXY_URL=https://api.latchkey.me \
+  E2E_ADMIN_URL=https://payprompt-admin.vercel.app \
+  npx playwright test</pre>
+  </div>
+</div>
+
+<h3>5. Regenerate a bearer token</h3>
+<pre>cd packages/proxy
+~/.bun/bin/bun -e "
+import { encodeBearerToken } from './src/middleware/auth.ts'
+const t = await encodeBearerToken(
+  '0x6007ce7814ba19c6db28ed536e710ae7a10454d2f599356beaa6a71f91ffa7f1',
+  Math.floor(Date.now()/1000) + 30*86400   <span class="comment">// 30 days</span>
+)
+process.stdout.write(t)
+"</pre>
+<p>Paste the output as <code>ANTHROPIC_API_KEY</code> in <code>.env.client</code>.</p>
+
+<h3>6. Redeploy after code changes</h3>
+<pre><span class="comment"># Proxy:</span>
+ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 \
+  "cd /root/latchkey && git pull origin ma/3 && bun install --frozen-lockfile && systemctl restart latchkey-proxy"
+
+<span class="comment"># Admin dashboard:</span>
+cd packages/admin && vercel --prod --yes</pre>
+
+<hr class="divider">
+
+<h2>Infrastructure reference</h2>
+<table>
+  <tr><th>Resource</th><th>Details</th></tr>
+  <tr><td>Proxy</td><td><a href="https://api.latchkey.me">https://api.latchkey.me</a> · Servury VPS 151.247.22.152</td></tr>
+  <tr><td>Admin</td><td><a href="https://payprompt-admin.vercel.app">https://payprompt-admin.vercel.app</a> · Vercel project <code>payprompt-admin</code></td></tr>
+  <tr><td>GitHub</td><td><a href="https://github.com/marvinmarnold/latchkey/tree/ma/3">github.com/marvinmarnold/latchkey · ma/3</a></td></tr>
+  <tr><td>SSH</td><td><code>ssh -i ~/.ssh/id_ed25519 root@151.247.22.152</code> (passwordless)</td></tr>
+  <tr><td>Balance check</td><td>Phase 1 mock mode — <code>BALANCE_CONTRACT_ADDRESS</code> is empty, all EVM tokens pass</td></tr>
+</table>
+
+<div class="note">💡 Token expires <strong>2026-06-30</strong>. <code>.env.client</code> has the regen command in a comment at the top.</div>
+
+</body>
+</html>

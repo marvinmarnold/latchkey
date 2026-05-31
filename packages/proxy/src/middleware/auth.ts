@@ -71,13 +71,10 @@ export async function verifyBearerToken(encoded: string): Promise<{ callerAddres
     return { callerAddress: recovered, chain: 'evm' }
   }
 
+  // Solana rail disabled — phase 1 is EVM-only
+  // Re-enable when SOLANA_ENABLED=true is set and phase 5 is active
   if (isSolanaAddress(token.address)) {
-    const pubkeyBytes = bs58.decode(token.address)
-    const sigBytes = bs58.decode(token.sig)
-    const message = solanaSigningPayload(token.address, token.expiry, token.nonce)
-    const valid = await ed.verifyAsync(sigBytes, message, pubkeyBytes)
-    if (!valid) throw new Error('Invalid Solana signature')
-    return { callerAddress: token.address, chain: 'solana' }
+    throw new Error('Solana auth is not enabled (EVM only)')
   }
 
   throw new Error('Unknown address format — expected EVM 0x... or Solana base58 pubkey')

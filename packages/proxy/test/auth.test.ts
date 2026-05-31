@@ -32,21 +32,10 @@ describe('auth — EVM', () => {
   })
 })
 
-describe('auth — Solana', () => {
-  it('verifies a valid Solana bearer token', async () => {
-    // Generate a fresh ed25519 keypair from a deterministic seed
+describe('auth — Solana (disabled in phase 1)', () => {
+  it('rejects a Solana token with disabled error', async () => {
     const seed = new Uint8Array(32).fill(42)
     const encoded = await encodeSolanaBearerToken(seed)
-    const { chain } = await verifyBearerToken(encoded)
-    expect(chain).toBe('solana')
-  })
-
-  it('rejects a tampered Solana token', async () => {
-    const seed = new Uint8Array(32).fill(7)
-    const encoded = await encodeSolanaBearerToken(seed)
-    const token = JSON.parse(Buffer.from(encoded, 'base64').toString())
-    token.nonce = 'tampered'
-    const bad = Buffer.from(JSON.stringify(token)).toString('base64')
-    await expect(verifyBearerToken(bad)).rejects.toThrow('Invalid Solana signature')
+    await expect(verifyBearerToken(encoded)).rejects.toThrow('Solana auth is not enabled')
   })
 })
