@@ -49,7 +49,9 @@
 <h1>Latchkey — Session Summary <span class="badge green">✓ Phase 1 complete</span></h1>
 <p class="subtitle">2026-05-31 · branch <code>ma/3</code> · <a href="https://api.latchkey.me/health">api.latchkey.me</a> · <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></p>
 
+<div class="ok">✓ Full Claude Code → proxy → billing → admin loop verified end-to-end. <code>claude -p "say the word hello"</code> routed through api.latchkey.me as claude-opus-4-8, 6 tokens appeared in /admin/usage within seconds.</div>
 <div class="ok">✓ Root cause of missing billing data fixed: server .env had stale <code>BALANCE_CONTRACT_ADDRESS</code>, causing 402 on every request. Cleared. E2E billing loop test now catches this automatically.</div>
+<div class="ok">✓ Admin dashboard now auto-refreshes every 30s — no manual reload needed.</div>
 
 <h2>What was built this session</h2>
 
@@ -125,7 +127,11 @@
 <h2>How to verify yourself</h2>
 
 <div class="step"><div class="num">1</div><div class="step-body"><strong>Use Claude Code through the proxy</strong><pre>source .env.client
-claude</pre><p>Send any message. Reload <a href="https://payprompt-admin.vercel.app">the admin dashboard</a> to see new token usage (no auto-refresh).</p></div></div>
+claude</pre><p>Send any message. The admin dashboard auto-refreshes every 30s — wait a moment and watch the token count rise.</p>
+<p>Quick non-interactive test (verified working — response: <code>hello</code>, delta: 6 tokens via claude-opus-4-8):</p>
+<pre>ANTHROPIC_BASE_URL=https://api.latchkey.me \
+ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
+claude -p "say the word hello and nothing else"</pre></div></div>
 
 <div class="step"><div class="num">2</div><div class="step-body"><strong>Smoke-test the proxy</strong><pre>curl https://api.latchkey.me/health
 curl https://api.latchkey.me/admin/usage</pre></div></div>
