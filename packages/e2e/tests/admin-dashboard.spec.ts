@@ -3,6 +3,10 @@ import { test, expect } from '@playwright/test'
 const PROXY_URL = process.env.E2E_PROXY_URL ?? 'http://localhost:3002'
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? 'http://localhost:3001'
 
+// Are we hitting a live production environment? If so, skip tests that assert
+// specific seeded values — production has real (different) data.
+const IS_PRODUCTION = !!(process.env.E2E_PROXY_URL && process.env.E2E_ADMIN_URL)
+
 // ---------------------------------------------------------------------------
 // API contract tests — /admin/usage endpoint
 // ---------------------------------------------------------------------------
@@ -23,11 +27,29 @@ test.describe('GET /admin/usage', () => {
     expect(res.headers()['access-control-allow-origin']).toBe('*')
   })
 
+  test('rows have valid date, key, tokens fields', async ({ request }) => {
+    const res = await request.get(`${PROXY_URL}/admin/usage`)
+    const { byWallet, byProvider, byModel } = await res.json() as {
+      byWallet: Array<{ date: string; key: string; tokens: number }>
+      byProvider: Array<{ date: string; key: string; tokens: number }>
+      byModel: Array<{ date: string; key: string; tokens: number }>
+    }
+    for (const rows of [byWallet, byProvider, byModel]) {
+      for (const row of rows) {
+        expect(row.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+        expect(typeof row.key).toBe('string')
+        expect(row.tokens).toBeGreaterThan(0)
+      }
+    }
+  })
+
+  // --- Local-only tests: assert specific seeded values ---
+
   test('seeded billing data is present in byWallet', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byWallet } = await res.json() as { byWallet: Array<{ date: string; key: string; tokens: number }> }
 
-    // We seeded data for 0xE2eTestWallet...
     const walletRows = byWallet.filter(r => r.key.toLowerCase().startsWith('0xe2etest'))
     expect(walletRows.length).toBeGreaterThan(0)
     expect(walletRows.every(r => r.tokens > 0)).toBe(true)
@@ -35,6 +57,7 @@ test.describe('GET /admin/usage', () => {
   })
 
   test('seeded billing data is present in byProvider', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byProvider } = await res.json() as { byProvider: Array<{ date: string; key: string; tokens: number }> }
 
@@ -43,6 +66,7 @@ test.describe('GET /admin/usage', () => {
   })
 
   test('seeded billing data is present in byModel', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byModel } = await res.json() as { byModel: Array<{ date: string; key: string; tokens: number }> }
 
@@ -50,17 +74,17 @@ test.describe('GET /admin/usage', () => {
     expect(claudeRows.length).toBeGreaterThan(0)
 
     const totalTokens = claudeRows.reduce((sum, r) => sum + r.tokens, 0)
-    // We seeded 1200+480 + 800+320 = 2800 claude tokens
-    expect(totalTokens).toBe(2800)
+    expect(totalTokens).toBe(2800) // seeded: 1200+480 + 800+320
   })
 
   test('token counts are sums of input + output', async ({ request }) => {
+    test.skip(IS_PRODUCTION, 'seeded test data not present in production DB')
     const res = await request.get(`${PROXY_URL}/admin/usage`)
     const { byModel } = await res.json() as { byModel: Array<{ date: string; key: string; tokens: number }> }
 
     const dsRow = byModel.find(r => r.key === 'deepseek-ai/DeepSeek-V3')
     expect(dsRow).toBeDefined()
-    expect(dsRow?.tokens).toBe(700) // 500 + 200
+    expect(dsRow?.tokens).toBe(700) // seeded: 500 + 200
   })
 })
 
@@ -103,12 +127,26 @@ test.describe('Admin dashboard UI', () => {
     expect(svgCount).toBeGreaterThanOrEqual(3)
   })
 
-  test('wallet address appears truncated in legend', async ({ page }) => {
+  test('EVM wallet addresses are truncated in legend', async ({ page }) => {
     await page.goto(ADMIN_URL)
     await expect(page.getByText('Loading…')).not.toBeVisible({ timeout: 10000 })
 
-    // Wallet 0xE2eTestWallet... should be truncated to 0xE2eT…7890
     const legend = page.locator('.recharts-legend-wrapper').first()
-    await expect(legend).toContainText('0xE2eT')
+    const text = await legend.textContent() ?? ''
+
+    // If there are 0x wallet addresses, they must be truncated (≤ 14 chars: "0x1234…5678")
+    const rawEvmPattern = /0x[0-9a-fA-F]{10,}/  // un-truncated EVM address
+    expect(rawEvmPattern.test(text)).toBe(false)
+
+    if (IS_PRODUCTION) {
+      // Production has real wallets — just verify the truncation format for any 0x address shown
+      const truncatedPattern = /0x[0-9a-fA-F]{4}…/
+      if (text.includes('0x')) {
+        expect(truncatedPattern.test(text)).toBe(true)
+      }
+    } else {
+      // Local: our seeded wallet 0xE2eTestWallet... should appear truncated
+      expect(text).toContain('0xE2eT')
+    }
   })
 })
