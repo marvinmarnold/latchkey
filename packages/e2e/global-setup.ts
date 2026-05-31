@@ -114,4 +114,7 @@ export default async function globalSetup() {
 
   console.log(`[e2e] Phase 1 smoke test passed — proxy responded ${proxyRes.status} for wallet ${TEST_WALLET}`)
   console.log(`[e2e] Proxy running on port ${PROXY_PORT} with live billing data`)
+
+  // Write the token to a temp file so the billing loop test can make its own request
+  fs.writeFileSync(path.join(__dirname, '.e2e-token'), tokenResult, 'utf8')
 }
