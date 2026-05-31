@@ -11,11 +11,16 @@ import { discoverModels } from './discovery'
 import { extractUsageFromStream, computeCost, logUsage } from './billing'
 import { enqueueProofJob, startProofWorker } from './zktls'
 import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
+import { queryUsage } from './admin'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
 export function buildApp(db: Database) {
   const app = new Elysia()
     .get('/health', () => ({ status: 'ok', version: '0.1.0' }))
+    .get('/admin/usage', ({ set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryUsage(db)
+    })
 
   const api = new Elysia()
     .resolve(async ({ request }) => {
