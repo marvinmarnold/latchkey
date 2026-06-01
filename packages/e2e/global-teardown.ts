@@ -3,9 +3,10 @@ import * as path from 'path'
 
 export default async function globalTeardown() {
   const pid = process.env.E2E_PROXY_PID
-  if (pid) {
+  const pidNum = Number(pid)
+  if (pid && Number.isInteger(pidNum) && pidNum > 0) {
     try {
-      process.kill(Number(pid), 'SIGTERM')
+      process.kill(pidNum, 'SIGTERM')
       console.log(`[e2e] Proxy (pid ${pid}) stopped`)
     } catch {
       // already exited

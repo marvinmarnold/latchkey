@@ -71,6 +71,9 @@ async function fingerprintListing(db: Database, listing: Listing): Promise<void>
 
   if (existing && existing.response_hash !== responseHash) {
     console.warn(`[fingerprint] MISMATCH for listing ${listing.id}: expected ${existing.response_hash.slice(0, 8)}… got ${responseHash.slice(0, 8)}…`)
+    // Do NOT update the baseline on mismatch — the original hash is the ground truth.
+    // If we overwrote it, a subsequent swap back to the real model would go undetected.
+    return
   } else if (!existing) {
     console.log(`[fingerprint] recorded baseline for listing ${listing.id}`)
   }
