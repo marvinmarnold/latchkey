@@ -27,13 +27,15 @@ Use the OpenAI API to review the same diff independently — separate from CodeR
 # Get the diff for review
 git diff main...HEAD -- '*.ts' '*.sol' | head -500
 ```
-Then call OpenAI:
+Then call OpenAI (capture the diff first, then embed it):
 ```bash
+DIFF=$(git diff main...HEAD -- '*.ts' | head -500)
+OPENAI_KEY=$(grep OPENAI_API_KEY packages/proxy/.env | cut -d= -f2)
 curl -s https://api.openai.com/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $(grep OPENAI_API_KEY packages/proxy/.env | cut -d= -f2)" \
-  -d "{\"model\":\"gpt-4o\",\"temperature\":0.3,\"messages\":[{\"role\":\"system\",\"content\":\"You are a senior backend engineer reviewing a TypeScript pull request. Be direct, flag real correctness and security issues only. Ignore style.\"},
-{\"role\":\"user\",\"content\":\"Review this diff:\\n\$(git diff main...HEAD -- '*.ts' | head -400)\"}]}" \
+  -H "Authorization: Bearer $OPENAI_KEY" \
+  -d "{\"model\":\"gpt-4o\",\"temperature\":0.3,\"messages\":[{\"role\":\"system\",\"content\":\"You are a senior backend engineer reviewing a TypeScript pull request. Be direct, flag real correctness and security issues only. Ignore style. Max 300 words.\"},
+{\"role\":\"user\",\"content\":$(echo "$DIFF" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]}" \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])"
 ```
 

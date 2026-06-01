@@ -364,13 +364,18 @@ describe('Solana auth', () => {
     }
   })
 
-  it('accrues usage for Solana wallet address in billing_log', async () => {
+  it('accrues usage under the exact Solana base58 address in billing_log', async () => {
     await fetch(`http://localhost:${SOL_PROXY_PORT}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${solToken}` },
       body: JSON.stringify({ model: 'test/SolModel', messages: [{ role: 'user', content: 'Hi' }] }),
     })
+    // Derive the expected address from the seed so the assertion is deterministic.
+    const { getPublicKeyAsync } = await import('@noble/ed25519')
+    const bs58mod = await import('bs58')
+    const pubKey = await getPublicKeyAsync(SOLANA_SEED)
+    const expectedAddress = bs58mod.default.encode(pubKey)
     const rows = solDb.query<{ caller_address: string }, []>('SELECT caller_address FROM billing_log').all()
-    expect(rows.some(r => r.caller_address.length > 20 && !r.caller_address.startsWith('0x'))).toBe(true)
+    expect(rows.some(r => r.caller_address === expectedAddress)).toBe(true)
   })
 })
