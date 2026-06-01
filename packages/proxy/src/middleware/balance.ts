@@ -51,6 +51,10 @@ async function getSolanaUSDCBalance(walletAddress: string): Promise<bigint> {
 
 export async function getCallerBalance(callerAddress: string, chain: Chain = 'evm'): Promise<bigint> {
   if (chain === 'solana') {
+    // Phase 5: on-chain Solana billing requires a deployed Solana program (not yet wired).
+    // Gate the real SPL check behind SOLANA_BILLING_ENABLED=true; otherwise pass through
+    // with a mock balance so usage is still accrued for dashboard visibility.
+    if (process.env.SOLANA_BILLING_ENABLED !== 'true') return BigInt(1_000_000_000)
     return getSolanaUSDCBalance(callerAddress)
   }
 
