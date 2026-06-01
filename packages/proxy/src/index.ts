@@ -17,9 +17,8 @@ import { startPullWorker } from './puller'
 import { makePullChain } from './pullchain'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
-// Phase 2 pull-payment config. When BILLING_CONTRACT_ADDRESS is unset the proxy
-// stays in Phase 1 mock mode: no allowance gate, no pulls (accrual still logged).
-const BILLING_CONTRACT = process.env.BILLING_CONTRACT_ADDRESS || ''
+// Phase 2 pull config — read at startup for the worker, but also re-read per-request
+// for the gate so test overrides of process.env take effect.
 const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
 const PULL_SCALE = 10 ** USDC_DECIMALS
 const PULL_THRESHOLD_USD = Number(process.env.PULL_THRESHOLD_USD ?? 0.10)
@@ -47,10 +46,12 @@ export function buildApp(db: Database) {
       if (!encoded) return status(401, { error: { type: 'authentication_error', message: 'Missing token' } })
       try {
         const { callerAddress, chain } = await verifyBearerToken(encoded)
-        if (BILLING_CONTRACT) {
+        // Read at request time so test env overrides take effect.
+        const billingContract = process.env.BILLING_CONTRACT_ADDRESS || ''
+        if (billingContract) {
           // Phase 2: RPC-free hot path — blocked check + first-seen allowance gate.
           await assertWalletAllowed(db, callerAddress, {
-            readAllowance: (a) => readUsdcAllowance(a, BILLING_CONTRACT),
+            readAllowance: (a) => readUsdcAllowance(a, billingContract),
             thresholdAtomic: PULL_THRESHOLD_ATOMIC,
           })
         } else {
@@ -159,14 +160,15 @@ if (import.meta.main) {
   )
   startFingerprintWorker(db)
   // Phase 2: pull-payment worker — only when a billing contract + signer are configured.
-  if (BILLING_CONTRACT && process.env.PROXY_PRIVATE_KEY) {
+  const billingContractAtStartup = process.env.BILLING_CONTRACT_ADDRESS || ''
+  if (billingContractAtStartup && process.env.PROXY_PRIVATE_KEY) {
     const chain = makePullChain({
-      billingContract: BILLING_CONTRACT as `0x${string}`,
+      billingContract: billingContractAtStartup as `0x${string}`,
       proxyPrivateKey: process.env.PROXY_PRIVATE_KEY as `0x${string}`,
       rpcUrl: process.env.BASE_RPC_URL ?? 'https://sepolia.base.org',
     })
     startPullWorker(db, chain, { thresholdUsd: PULL_THRESHOLD_USD, scale: PULL_SCALE })
-    console.log(`[puller] pull-payment worker started (threshold $${PULL_THRESHOLD_USD}, contract ${BILLING_CONTRACT})`)
+    console.log(`[puller] pull-payment worker started (threshold $${PULL_THRESHOLD_USD}, contract ${billingContractAtStartup})`)
   } else {
     console.log('[puller] disabled — BILLING_CONTRACT_ADDRESS/PROXY_PRIVATE_KEY not set (Phase 1 mock mode)')
   }

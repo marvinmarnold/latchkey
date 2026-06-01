@@ -10,13 +10,14 @@ export type WalletStateRow = {
   total_pulled_usd: number
   pull_failure_count: number
   last_pull_at: number | null
+  last_pull_tx: string | null
   blocked: number
 }
 
 export function queryWallets(db: Database): WalletStateRow[] {
   return db
     .query<WalletStateRow, []>(
-      `SELECT address, accrued_usd, total_pulled_usd, pull_failure_count, last_pull_at, blocked
+      `SELECT address, accrued_usd, total_pulled_usd, pull_failure_count, last_pull_at, last_pull_tx, blocked
        FROM wallet_state
        ORDER BY accrued_usd DESC`,
     )

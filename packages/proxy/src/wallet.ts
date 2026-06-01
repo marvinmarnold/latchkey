@@ -9,6 +9,7 @@ export type WalletState = {
   pending_pull_tx: string | null
   pending_pull_raw: string | null
   last_pull_at: number | null
+  last_pull_tx: string | null
   blocked: number
 }
 

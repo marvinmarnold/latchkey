@@ -23,8 +23,9 @@ let token: string
 let db: ReturnType<typeof openDb>
 
 beforeAll(async () => {
-  // Clear so balance.ts falls back to the mock (test wallet has no on-chain deposit)
+  // Clear both contract addresses so tests run in Phase 1 mock mode
   process.env.BALANCE_CONTRACT_ADDRESS = ''
+  process.env.BILLING_CONTRACT_ADDRESS = ''
   token = await encodeBearerToken(TEST_KEY)
 
   // Mock provider — responds to POST /v1/chat/completions

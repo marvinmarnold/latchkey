@@ -6,6 +6,7 @@ export type WalletRow = {
   total_pulled_usd: number
   pull_failure_count: number
   last_pull_at: number | null
+  last_pull_tx: string | null
   blocked: number
   allowance_atomic?: string  // from /admin/allowance/:address — optional (on-chain, may be unavailable)
 }
@@ -39,6 +40,7 @@ export default function WalletTable({ rows }: { rows: WalletRow[] }) {
           <th style={{ ...thStyle, textAlign: 'right' }}>Lifetime pulled</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Allowance remaining</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Failures</th>
+          <th style={thStyle}>Last pull tx</th>
           <th style={thStyle}>Status</th>
         </tr>
       </thead>
@@ -50,6 +52,14 @@ export default function WalletTable({ rows }: { rows: WalletRow[] }) {
             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtUsd(r.total_pulled_usd)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtAllowance(r.allowance_atomic)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{r.pull_failure_count}</td>
+            <td style={tdStyle}>
+              {r.last_pull_tx
+                ? <a href={`https://sepolia.basescan.org/tx/${r.last_pull_tx}`} target="_blank" rel="noreferrer"
+                    style={{ color: '#6366f1', fontFamily: 'monospace', fontSize: 11 }}>
+                    {r.last_pull_tx.slice(0, 10)}…
+                  </a>
+                : <span style={{ color: '#525252' }}>—</span>}
+            </td>
             <td style={{ ...tdStyle, color: r.blocked ? '#fca5a5' : '#86efac' }}>
               {r.blocked ? '🔒 blocked' : '✓ active'}
             </td>

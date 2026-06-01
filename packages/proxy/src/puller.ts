@@ -26,7 +26,7 @@ export interface PullOpts {
 
 const now = () => Math.floor(Date.now() / 1000)
 
-function settle(db: Database, address: string, amountUsd: number): void {
+function settle(db: Database, address: string, amountUsd: number, txHash?: string): void {
   // Deduct the SNAPSHOT (not zero) so debt accrued during the pull window survives.
   db.run(
     `UPDATE wallet_state SET
@@ -34,9 +34,10 @@ function settle(db: Database, address: string, amountUsd: number): void {
        total_pulled_usd = total_pulled_usd + ?,
        pull_failure_count = 0,
        pending_pull_usd = NULL, pending_pull_tx = NULL, pending_pull_raw = NULL,
-       last_pull_at = ?
+       last_pull_at = ?,
+       last_pull_tx = COALESCE(?, last_pull_tx)
      WHERE address = ?`,
-    [amountUsd, amountUsd, now(), address],
+    [amountUsd, amountUsd, now(), txHash ?? null, address],
   )
 }
 
@@ -77,7 +78,7 @@ export async function processPulls(db: Database, chain: PullChain, opts: PullOpt
       if (w.pending_pull_raw) await chain.broadcastRaw(w.pending_pull_raw)
       receipt = hash ? await chain.waitForReceipt(hash) : { status: 'reverted' as const }
     }
-    if (receipt.status === 'success') settle(db, w.address, w.pending_pull_usd ?? 0)
+    if (receipt.status === 'success') settle(db, w.address, w.pending_pull_usd ?? 0, hash ?? undefined)
     else fail(db, w.address, maxFailures)
   }
 
@@ -101,7 +102,7 @@ export async function processPulls(db: Database, chain: PullChain, opts: PullOpt
     )
     await chain.broadcastRaw(raw)
     const receipt = await chain.waitForReceipt(hash)
-    if (receipt.status === 'success') settle(db, w.address, snapshot)
+    if (receipt.status === 'success') settle(db, w.address, snapshot, hash)
     else fail(db, w.address, maxFailures)
   }
 }

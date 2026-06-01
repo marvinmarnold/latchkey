@@ -115,9 +115,20 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
       pending_pull_tx     TEXT,
       pending_pull_raw    TEXT,
       last_pull_at        INTEGER,
+      last_pull_tx        TEXT,
       blocked             INTEGER NOT NULL DEFAULT 0
     )
   `)
+
+  // Migration: add last_pull_tx if it doesn't exist yet
+  const hasLastPullTx = db
+    .query<{ count: number }, []>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('wallet_state') WHERE name = 'last_pull_tx'`,
+    )
+    .get()
+  if (hasLastPullTx && hasLastPullTx.count === 0) {
+    db.run(`ALTER TABLE wallet_state ADD COLUMN last_pull_tx TEXT`)
+  }
 
   return db
 }
