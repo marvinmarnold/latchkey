@@ -2,7 +2,7 @@ import { Elysia, status } from 'elysia'
 import type { Database } from 'bun:sqlite'
 import { openDb, seedProviders } from './db'
 import { verifyBearerToken, extractTokenFromRequest } from './middleware/auth'
-import { assertSufficientBalance } from './middleware/balance'
+import { assertSufficientBalance, readUsdcAllowance } from './middleware/balance'
 import { normaliseAnthropicToOpenAI } from './format/normalise'
 import { translateOpenAIToAnthropic, openAIStreamToAnthropicStream } from './format/translate'
 import { selectListing, penaliseListing } from './router'
@@ -12,7 +12,18 @@ import { extractUsageFromStream, computeCost, logUsage } from './billing'
 import { enqueueProofJob, startProofWorker } from './zktls'
 import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
 import { queryUsage } from './admin'
+import { accrue, assertWalletAllowed } from './wallet'
+import { startPullWorker } from './puller'
+import { makePullChain } from './pullchain'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
+
+// Phase 2 pull-payment config. When BILLING_CONTRACT_ADDRESS is unset the proxy
+// stays in Phase 1 mock mode: no allowance gate, no pulls (accrual still logged).
+const BILLING_CONTRACT = process.env.BILLING_CONTRACT_ADDRESS || ''
+const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
+const PULL_SCALE = 10 ** USDC_DECIMALS
+const PULL_THRESHOLD_USD = Number(process.env.PULL_THRESHOLD_USD ?? 0.10)
+const PULL_THRESHOLD_ATOMIC = BigInt(Math.round(PULL_THRESHOLD_USD * PULL_SCALE))
 
 export function buildApp(db: Database) {
   const app = new Elysia()
@@ -28,7 +39,16 @@ export function buildApp(db: Database) {
       if (!encoded) return status(401, { error: { type: 'authentication_error', message: 'Missing token' } })
       try {
         const { callerAddress, chain } = await verifyBearerToken(encoded)
-        await assertSufficientBalance(callerAddress, chain)
+        if (BILLING_CONTRACT) {
+          // Phase 2: RPC-free hot path — blocked check + first-seen allowance gate.
+          await assertWalletAllowed(db, callerAddress, {
+            readAllowance: (a) => readUsdcAllowance(a, BILLING_CONTRACT),
+            thresholdAtomic: PULL_THRESHOLD_ATOMIC,
+          })
+        } else {
+          // Phase 1 mock mode.
+          await assertSufficientBalance(callerAddress, chain)
+        }
         return { callerAddress }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Invalid token'
@@ -45,9 +65,13 @@ export function buildApp(db: Database) {
         const { stream, json, isStreaming } = await forwardToProvider(listing, req, req.model)
         if (isStreaming && stream) {
           const providerHost = new URL(listing.endpoint).hostname
-        const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+          let billed = false // guard: providers may emit multiple usage events; bill only once
+          const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+            if (billed) return
+            billed = true
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
             const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
+            accrue(db, callerAddress, cost)
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           set.headers['Content-Type'] = 'text/event-stream'
@@ -58,6 +82,7 @@ export function buildApp(db: Database) {
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
         const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
+        accrue(db, callerAddress, cost)
         try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
@@ -75,9 +100,13 @@ export function buildApp(db: Database) {
         const { stream, json, isStreaming } = await forwardToProvider(listing, openAIReq, req.model)
         const msgProviderHost = new URL(listing.endpoint).hostname
         if (isStreaming && stream) {
+          let msgBilled = false
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+            if (msgBilled) return
+            msgBilled = true
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
             const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
+            accrue(db, callerAddress, cost)
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           const anthropicStream = openAIStreamToAnthropicStream(billedStream)
@@ -89,6 +118,7 @@ export function buildApp(db: Database) {
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
         const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
+        accrue(db, callerAddress, cost)
         try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
@@ -120,4 +150,16 @@ if (import.meta.main) {
     (e) => console.warn('[fingerprint]', (e as Error).message),
   )
   startFingerprintWorker(db)
+  // Phase 2: pull-payment worker — only when a billing contract + signer are configured.
+  if (BILLING_CONTRACT && process.env.PROXY_PRIVATE_KEY) {
+    const chain = makePullChain({
+      billingContract: BILLING_CONTRACT as `0x${string}`,
+      proxyPrivateKey: process.env.PROXY_PRIVATE_KEY as `0x${string}`,
+      rpcUrl: process.env.BASE_RPC_URL ?? 'https://sepolia.base.org',
+    })
+    startPullWorker(db, chain, { thresholdUsd: PULL_THRESHOLD_USD, scale: PULL_SCALE })
+    console.log(`[puller] pull-payment worker started (threshold $${PULL_THRESHOLD_USD}, contract ${BILLING_CONTRACT})`)
+  } else {
+    console.log('[puller] disabled — BILLING_CONTRACT_ADDRESS/PROXY_PRIVATE_KEY not set (Phase 1 mock mode)')
+  }
 }

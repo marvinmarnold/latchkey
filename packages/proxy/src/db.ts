@@ -102,6 +102,23 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
     )
   `)
 
+  // Phase 2: per-wallet pull-payment accounting.
+  // accrued_usd = off-chain debt not yet pulled; pending_* = a pull in flight
+  // (snapshot + deterministic tx hash + raw signed tx, for crash-safe re-broadcast).
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wallet_state (
+      address             TEXT PRIMARY KEY,
+      accrued_usd         REAL    NOT NULL DEFAULT 0.0,
+      total_pulled_usd    REAL    NOT NULL DEFAULT 0.0,
+      pull_failure_count  INTEGER NOT NULL DEFAULT 0,
+      pending_pull_usd    REAL,
+      pending_pull_tx     TEXT,
+      pending_pull_raw    TEXT,
+      last_pull_at        INTEGER,
+      blocked             INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+
   return db
 }
 
