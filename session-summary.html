@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Latchkey — Phase 2 Session Summary</title>
+<title>Latchkey — Phase 2 Complete</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e5e5e5; padding: 2rem; line-height: 1.6; max-width: 900px; }
@@ -17,10 +17,9 @@
   pre { font-family: 'SF Mono', monospace; font-size: 0.78rem; background: #141414; border: 1px solid #1f1f1f; padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; margin: 0.6rem 0 1rem; color: #e5e5e5; line-height: 1.6; }
   pre .c { color: #404040; }
   .ok   { background: #021a0a; border: 1px solid #0d3d1a; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #86efac; margin: 0.5rem 0 1rem; }
-  .warn { background: #1a0d00; border: 1px solid #3d2000; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #fcd34d; margin: 0.5rem 0 1rem; }
   .note { background: #050f1a; border: 1px solid #0d2340; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #93c5fd; margin: 0.5rem 0 1rem; }
   .badge { display: inline-block; font-size: 0.68rem; padding: 0.15rem 0.55rem; border-radius: 99px; font-weight: 600; vertical-align: middle; margin-left: 0.4rem; }
-  .green  { background: #052e16; color: #86efac; }
+  .green { background: #052e16; color: #86efac; }
   .yellow { background: #2c1503; color: #fcd34d; }
   table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.5rem 0 1rem; }
   th { text-align: left; padding: 0.4rem 0.75rem; color: #404040; font-weight: 500; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1f1f1f; }
@@ -33,82 +32,68 @@
 </head>
 <body>
 
-<h1>Latchkey — Phase 2 Session Summary</h1>
-<p class="subtitle">Branch <code>ma/4</code> · all local work complete · blocked on operator gas for on-chain tail</p>
+<h1>Latchkey — Phase 2 Complete <span class="badge green">✓</span></h1>
+<p class="subtitle">Branch <code>ma/4</code> · <a href="https://github.com/marvinmarnold/latchkey/pull/2">PR #2</a> open into main</p>
 
-<div class="warn">⛽ Blocked on funding: operator wallet <code>0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034</code> has 0 ETH. Send ~0.05 Base Sepolia ETH to unblock the on-chain tail (deploy → Ponder live → manual E2E).</div>
+<div class="ok">✓ Pull-payment billing verified end-to-end on Base Sepolia. USDC moved from caller wallet to operator on-chain. All tests green.</div>
 
-<h2>What was built (local milestone complete)</h2>
-
+<h2>On-chain verification</h2>
 <table>
-  <tr><th>Part</th><th>What</th><th>Status</th></tr>
-  <tr><td>Part 0</td><td>Fix billing units — dollars everywhere, no more micro-unit confusion</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Part 1</td><td><code>LatchkeyBilling.sol</code> — pull-payment contract (no vault), 17 forge tests</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Part 2</td><td>Crash-safe pull worker — <code>wallet_state</code>, <code>accrue()</code>, <code>assertWalletAllowed()</code>, <code>processPulls()</code>. 16 TDD unit tests.</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Part 3</td><td>Ponder indexer scaffold — wired, awaiting contract address</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Part 4</td><td>Admin dashboard wallet state — <code>GET /admin/wallets</code>, <code>GET /admin/allowance/:address</code>, <code>WalletTable</code> component</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Part 5</td><td>CONTEXT.md — Latchkey rename, Session/Pull Threshold/Accrued Debt terms</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
-  <tr><td>Ponder live</td><td>Activate indexer with deployed contract address</td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
-  <tr><td>Deploy</td><td>Deploy <code>LatchkeyBilling</code> to Base Sepolia, wire <code>BILLING_CONTRACT_ADDRESS</code></td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
-  <tr><td>On-chain E2E</td><td>approve → spend → pull → block flow on real chain</td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
+  <tr><th>Item</th><th>Value</th></tr>
+  <tr><td>Contract</td><td class="mono"><a href="https://sepolia.basescan.org/address/0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7">0x380ad468…83f7</a> (LatchkeyBilling, Base Sepolia)</td></tr>
+  <tr><td>Pull tx</td><td class="mono"><a href="https://sepolia.basescan.org/tx/0xb139ad76fda9b65797577245b3a53fbfca2d80f5f897912ea7888caa3c766988">0xb139ad76…6988</a> · block 42257259</td></tr>
+  <tr><td>Gross pulled</td><td>1188 atomic units = $0.001188 USDC</td></tr>
+  <tr><td>Fee (1%)</td><td>11 atomic units → treasury</td></tr>
+  <tr><td>Net to operator</td><td>1177 atomic units → proxy wallet</td></tr>
+  <tr><td>Caller USDC</td><td>15.0 → 14.998812 ✓</td></tr>
 </table>
 
 <h2>Test results</h2>
-<div class="ok">52 proxy unit tests (bun) + 17 forge tests (Foundry) + 12 Playwright E2E — all green. DeepSeek final review: no blockers found.</div>
-
-<h2>Phase 2 design summary</h2>
 <ul>
-  <li><strong>No pre-deposit</strong> — caller does one <code>usdc.approve(LatchkeyBilling, large_amount)</code>, then uses the proxy immediately</li>
-  <li><strong>Off-chain accounting</strong> — <code>wallet_state.accrued_usd</code> tracks debt in dollars (canonical unit); conversion to USDC atomic units only at pull time</li>
-  <li><strong>Crash-safe pull</strong> — sign tx locally → persist (snapshot + hash + raw) → broadcast. On restart: re-broadcast the saved raw tx (same nonce+payload = same hash = idempotent)</li>
-  <li><strong>Hot path is RPC-free</strong> — blocked check + known-wallet bypass; first-seen wallets do one allowance read then cache</li>
-  <li><strong>Activation gate</strong> — all Phase 2 behaviour keyed on <code>BILLING_CONTRACT_ADDRESS</code>; empty = Phase 1 mock (prod is safe until deploy)</li>
+  <li>52 proxy unit tests (bun) ✓</li>
+  <li>17 forge tests (Foundry) ✓</li>
+  <li>12 local E2E (Playwright) ✓</li>
+  <li>9/9 production E2E (3 local-data skips expected) ✓</li>
 </ul>
 
-<h2>What to do when funding arrives</h2>
+<h2>What was built</h2>
+<ul>
+  <li><strong>Billing units fixed</strong> — all prices in dollars per million tokens, <code>cost_usd</code> in dollars. No more ambiguous micro-units.</li>
+  <li><strong>LatchkeyBilling.sol</strong> — pull-payment contract. Callers approve once, proxy pulls when debt crosses threshold. 1% fee. <code>onlyProxy</code> guard.</li>
+  <li><strong>Crash-safe pull worker</strong> — sign → persist (snapshot + hash + raw) → broadcast. Re-broadcasts saved raw tx on restart (idempotent, same hash).</li>
+  <li><strong>RPC-free hot path</strong> — per-request gate reads local SQLite only. Allowance checked once for first-seen wallets, then cached.</li>
+  <li><strong>Admin wallet table</strong> — <code>GET /admin/wallets</code> + live allowance reads. Dashboard shows accrued debt, lifetime pulled, allowance remaining, blocked status.</li>
+  <li><strong>Ponder indexer scaffold</strong> — <code>packages/indexer/</code> ready to index <code>Pulled</code> events once an Alchemy key is wired.</li>
+</ul>
 
-<div class="note">Send ~0.05 Base Sepolia ETH to <code>0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034</code>, then I'll run everything below automatically.</div>
+<h2>Remaining for Ponder live indexing</h2>
+<p>Set <code>INDEXER_RPC_URL</code> to an Alchemy Base Sepolia key in <code>packages/indexer/.env</code> (copy from <code>.env.example</code>), set <code>INDEXER_START_BLOCK=42257000</code> (just before the contract deploy block), then <code>cd packages/indexer && npm run dev</code>. The admin dashboard will then show on-chain pull history in the WalletTable once the Ponder GraphQL query is wired.</p>
 
-<h3>1. Deploy the contract</h3>
-<pre>cd packages/contracts
-USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e \
-TREASURY_ADDRESS=0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 \
-PROXY_ADDRESS=0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 \
-~/.foundry/bin/forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
-  --private-key 0x9c190254f45fd2e9e81dabd456b2ab994e412349daa24877148146909d31de66 \
-  --broadcast</pre>
+<h2>How to verify yourself</h2>
 
-<h3>2. Wire the contract address</h3>
-<pre><span class="c"># In packages/proxy/.env:</span>
-BILLING_CONTRACT_ADDRESS=&lt;deployed address&gt;
+<h3>1. Check the pull tx on Base Sepolia</h3>
+<p>Open <a href="https://sepolia.basescan.org/tx/0xb139ad76fda9b65797577245b3a53fbfca2d80f5f897912ea7888caa3c766988">sepolia.basescan.org</a> — you'll see the <code>Pulled</code> event with caller <code>0xe65710…</code>, gross 1188, fee 11.</p>
 
-<span class="c"># Deploy proxy + sync env to server:</span>
-ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 "cd /root/latchkey && git pull origin ma/4 && ..."
-bash deploy/sync-env.sh</pre>
+<h3>2. Check the admin dashboard</h3>
+<p>Open <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a>. The Wallet billing state table shows your wallet with <code>total_pulled = $0.001188</code> and <code>accrued = $0.000000</code>.</p>
 
-<h3>3. Run on-chain E2E</h3>
-<pre><span class="c"># Fund test wallet (already has 15 USDC, needs gas for approve())
-# Then approve:</span>
-cast send 0x036CbD53842c5426634e7929541eC2318f3dCF7e \
-  "approve(address,uint256)" &lt;BILLING_CONTRACT&gt; 10000000 \
-  --private-key 0x6007ce78... --rpc-url https://sepolia.base.org
+<h3>3. Make a request and watch accrual</h3>
+<pre>source .env.client && claude -p "say hello"</pre>
+<p>Then check <code>GET https://api.latchkey.me/admin/wallets</code> — <code>accrued_usd</code> increments by the request cost.</p>
 
-<span class="c"># Drive requests until $0.10 accrued, watch pull tx appear on-chain</span>
-source .env.client && claude -p "say hello"  <span class="c"># repeat ~10x</span></pre>
+<h3>4. Review the PR</h3>
+<p><a href="https://github.com/marvinmarnold/latchkey/pull/2">github.com/marvinmarnold/latchkey/pull/2</a></p>
 
-<h3>4. Verify the admin dashboard</h3>
-<p>After a pull fires, the <code>WalletTable</code> at <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> shows the accrued debt and lifetime-pulled columns.</p>
-
-<h2>Infrastructure</h2>
+<h2>Key addresses</h2>
 <table>
-  <tr><th>Resource</th><th>Details</th></tr>
-  <tr><td>Proxy</td><td><a href="https://api.latchkey.me">api.latchkey.me</a> · still running Phase 1</td></tr>
-  <tr><td>Admin</td><td><a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></td></tr>
-  <tr><td>Branch</td><td><a href="https://github.com/marvinmarnold/latchkey/tree/ma/4">ma/4</a> — PR into main after on-chain E2E passes</td></tr>
-  <tr><td>Operator wallet</td><td class="mono">0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 ← needs gas</td></tr>
-  <tr><td>Caller wallet</td><td class="mono">0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89 · 0.025 ETH + 15 USDC ✓</td></tr>
+  <tr><th>Role</th><th>Address</th></tr>
+  <tr><td>LatchkeyBilling contract</td><td class="mono">0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7</td></tr>
+  <tr><td>Operator (proxy + treasury)</td><td class="mono">0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034</td></tr>
+  <tr><td>Caller (test wallet)</td><td class="mono">0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89</td></tr>
   <tr><td>USDC (Base Sepolia)</td><td class="mono">0x036CbD53842c5426634e7929541eC2318f3dCF7e</td></tr>
 </table>
+
+<div class="note">💡 Both private keys are in <code>packages/proxy/.env</code>: <code>TEST_PRIVATE_KEY</code> (caller) and <code>PROXY_PRIVATE_KEY</code> (operator). That file is gitignored.</div>
 
 </body>
 </html>
