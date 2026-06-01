@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Latchkey — Session Summary</title>
+<title>Latchkey — Phase 2 Session Summary</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #e5e5e5; padding: 2rem; line-height: 1.6; max-width: 900px; }
@@ -16,158 +16,99 @@
   code { font-family: 'SF Mono', monospace; font-size: 0.78rem; background: #1c1c1c; border: 1px solid #2a2a2a; padding: 0.1rem 0.4rem; border-radius: 4px; color: #a5f3fc; }
   pre { font-family: 'SF Mono', monospace; font-size: 0.78rem; background: #141414; border: 1px solid #1f1f1f; padding: 1rem 1.25rem; border-radius: 8px; overflow-x: auto; margin: 0.6rem 0 1rem; color: #e5e5e5; line-height: 1.6; }
   pre .c { color: #404040; }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin: 0.75rem 0 1rem; }
-  .card { background: #141414; border: 1px solid #1f1f1f; border-radius: 8px; padding: 0.85rem 1rem; }
-  .card .label { font-size: 0.68rem; color: #404040; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.3rem; }
-  .card .value { font-family: monospace; font-size: 0.78rem; color: #a5f3fc; word-break: break-all; }
+  .ok   { background: #021a0a; border: 1px solid #0d3d1a; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #86efac; margin: 0.5rem 0 1rem; }
+  .warn { background: #1a0d00; border: 1px solid #3d2000; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #fcd34d; margin: 0.5rem 0 1rem; }
+  .note { background: #050f1a; border: 1px solid #0d2340; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #93c5fd; margin: 0.5rem 0 1rem; }
   .badge { display: inline-block; font-size: 0.68rem; padding: 0.15rem 0.55rem; border-radius: 99px; font-weight: 600; vertical-align: middle; margin-left: 0.4rem; }
   .green  { background: #052e16; color: #86efac; }
   .yellow { background: #2c1503; color: #fcd34d; }
-  .red    { background: #2d0a0a; color: #fca5a5; }
-  .blue   { background: #0c1a2e; color: #93c5fd; }
-  .step { display: flex; gap: 0.75rem; margin-bottom: 0.75rem; }
-  .num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; background: #1a1a1a; border: 1px solid #262626; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; color: #525252; margin-top: 0.15rem; }
-  .step-body { flex: 1; }
-  a { color: #6366f1; text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .warn { background: #1a0d00; border: 1px solid #3d2000; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #fcd34d; margin: 0.5rem 0 1rem; }
-  .ok   { background: #021a0a; border: 1px solid #0d3d1a; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #86efac; margin: 0.5rem 0 1rem; }
-  .note { background: #050f1a; border: 1px solid #0d2340; border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.82rem; color: #93c5fd; margin: 0.5rem 0 1rem; }
   table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.5rem 0 1rem; }
   th { text-align: left; padding: 0.4rem 0.75rem; color: #404040; font-weight: 500; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #1f1f1f; }
   td { padding: 0.4rem 0.75rem; border-bottom: 1px solid #141414; color: #d4d4d4; }
   tr:last-child td { border-bottom: none; }
   .mono { font-family: monospace; font-size: 0.78rem; color: #a5f3fc; }
-  .phase-done { color: #86efac; }
-  .phase-next { color: #fcd34d; }
-  .phase-off  { color: #525252; }
-  hr { border: none; border-top: 1px solid #141414; margin: 2rem 0; }
+  a { color: #6366f1; text-decoration: none; }
+  a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
 
-<h1>Latchkey — Session Summary <span class="badge green">✓ Phase 1 complete</span></h1>
-<p class="subtitle">2026-05-31 · branch <code>ma/3</code> · <a href="https://api.latchkey.me/health">api.latchkey.me</a> · <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></p>
+<h1>Latchkey — Phase 2 Session Summary</h1>
+<p class="subtitle">Branch <code>ma/4</code> · all local work complete · blocked on operator gas for on-chain tail</p>
 
-<div class="ok">✓ Full Claude Code → proxy → billing → admin loop verified end-to-end. <code>claude -p "say the word hello"</code> routed through api.latchkey.me as claude-opus-4-8, 6 tokens appeared in /admin/usage within seconds.</div>
-<div class="ok">✓ Root cause of missing billing data fixed: server .env had stale <code>BALANCE_CONTRACT_ADDRESS</code>, causing 402 on every request. Cleared. E2E billing loop test now catches this automatically.</div>
-<div class="ok">✓ Admin dashboard now auto-refreshes every 30s — no manual reload needed.</div>
+<div class="warn">⛽ Blocked on funding: operator wallet <code>0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034</code> has 0 ETH. Send ~0.05 Base Sepolia ETH to unblock the on-chain tail (deploy → Ponder live → manual E2E).</div>
 
-<h2>What was built this session</h2>
+<h2>What was built (local milestone complete)</h2>
 
-<h3>Admin dashboard <span class="badge green">live</span></h3>
-<ul>
-  <li><code>GET /admin/usage</code> on proxy — 30-day token aggregation by wallet / provider / model</li>
-  <li>Next.js 15 + Recharts at <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></li>
-  <li>Each chart now has a data table underneath (date, key, token count)</li>
-</ul>
-
-<h3>E2E test suite <span class="badge green">12 passing</span></h3>
-<ul>
-  <li>Billing loop test: makes a real <code>POST /v1/messages</code>, polls <code>/admin/usage</code> until token count increases</li>
-  <li>Local: 12 pass. Production (with <code>E2E_BEARER_TOKEN</code>): 9 pass, 3 skip</li>
-</ul>
-
-<h3>Rename: payprompt → latchkey <span class="badge green">complete</span></h3>
-<ul>
-  <li>Package names, DB file, EIP-712 domain, systemd service, server directory, startup logs</li>
-</ul>
-
-<h3>Solana auth disabled <span class="badge red">security</span></h3>
-<ul>
-  <li>Unknown caller used a Solana token while <code>BALANCE_CONTRACT_ADDRESS</code> was empty</li>
-  <li><code>verifyBearerToken</code> now returns 401 for any base58 address</li>
-</ul>
-
-<h3>Infrastructure <span class="badge green">set up</span></h3>
-<ul>
-  <li>SSH key authorized on server — all deploys are passwordless</li>
-  <li><code>deploy/sync-env.sh</code> — rewrites server .env without full redeploy</li>
-  <li>Vercel CLI authenticated as <code>geekyrocks</code></li>
-  <li>bun, node, npm, Playwright chromium installed locally</li>
-</ul>
-
-<h3>Agentic context updated</h3>
-<ul>
-  <li><code>CLAUDE.md</code> — deployment rules, phase table, critical invariants</li>
-  <li><code>AGENTS.md</code> — current state, deploy workflow, wallet/credential locations</li>
-  <li><code>README.md</code> — latchkey rename, accurate phase status, known gaps documented</li>
-  <li><code>docs/superpowers/plans/2026-05-31-phase2-5-improvements.md</code> — DeepSeek review findings stored for future phases</li>
-</ul>
-
-<h2>Credentials</h2>
-<div class="grid2">
-  <div class="card"><div class="label">Private key</div><div class="value">0x6007ce7814ba19c6db28ed536e710ae7a10454d2f599356beaa6a71f91ffa7f1</div></div>
-  <div class="card"><div class="label">EVM wallet address</div><div class="value">0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89</div></div>
-  <div class="card"><div class="label">Token file</div><div class="value">.env.client — expires 2026-06-30</div></div>
-  <div class="card"><div class="label">Server SSH</div><div class="value">ssh -i ~/.ssh/id_ed25519 root@151.247.22.152</div></div>
-</div>
-
-<h2>Phase 1 — final recommendations (for your approval)</h2>
-<p style="margin-bottom:0.75rem">DeepSeek confirmed: <strong>zero blockers for phase 2</strong>. All known gaps are acceptable for single-operator, invite-only use. Recommended improvements before opening to the public:</p>
 <table>
-  <tr><th>#</th><th>Item</th><th>When</th><th>Effort</th></tr>
-  <tr><td>1</td><td>Add auth to <code>GET /admin/usage</code> (basic bearer token)</td><td>When shared with others</td><td>Small</td></tr>
-  <tr><td>2</td><td>Per-wallet rate limiting (in-memory, 100 req/min)</td><td>Before public launch</td><td>Small</td></tr>
-  <tr><td>3</td><td>Upstream fallback — retry next cheapest on 5xx</td><td>Phase 2</td><td>Medium</td></tr>
-  <tr><td>4</td><td>30s request timeout on upstream calls</td><td>Phase 2</td><td>Small</td></tr>
-  <tr><td>5</td><td>Encrypt provider API keys at rest (AES-GCM, env-var key)</td><td>Phase 2</td><td>Medium</td></tr>
+  <tr><th>Part</th><th>What</th><th>Status</th></tr>
+  <tr><td>Part 0</td><td>Fix billing units — dollars everywhere, no more micro-unit confusion</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Part 1</td><td><code>LatchkeyBilling.sol</code> — pull-payment contract (no vault), 17 forge tests</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Part 2</td><td>Crash-safe pull worker — <code>wallet_state</code>, <code>accrue()</code>, <code>assertWalletAllowed()</code>, <code>processPulls()</code>. 16 TDD unit tests.</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Part 3</td><td>Ponder indexer scaffold — wired, awaiting contract address</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Part 4</td><td>Admin dashboard wallet state — <code>GET /admin/wallets</code>, <code>GET /admin/allowance/:address</code>, <code>WalletTable</code> component</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Part 5</td><td>CONTEXT.md — Latchkey rename, Session/Pull Threshold/Accrued Debt terms</td><td class="mono" style="color:#86efac">✓ committed</td></tr>
+  <tr><td>Ponder live</td><td>Activate indexer with deployed contract address</td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
+  <tr><td>Deploy</td><td>Deploy <code>LatchkeyBilling</code> to Base Sepolia, wire <code>BILLING_CONTRACT_ADDRESS</code></td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
+  <tr><td>On-chain E2E</td><td>approve → spend → pull → block flow on real chain</td><td class="mono" style="color:#fcd34d">⏳ needs gas</td></tr>
 </table>
-<div class="note">💡 Items 1-2 are the only ones worth doing before phase 2. Items 3-5 are naturally part of phase 2 scope. All are stored in <code>docs/superpowers/plans/2026-05-31-phase2-5-improvements.md</code>.</div>
 
-<h2>Phase 2-5 architectural findings (stored, not yet actioned)</h2>
-<p>Full notes in <code>docs/superpowers/plans/2026-05-31-phase2-5-improvements.md</code>. Key items:</p>
+<h2>Test results</h2>
+<div class="ok">52 proxy unit tests (bun) + 17 forge tests (Foundry) + 12 Playwright E2E — all green. DeepSeek final review: no blockers found.</div>
+
+<h2>Phase 2 design summary</h2>
 <ul>
-  <li><strong>Phase 2:</strong> Credit limit system (<code>balance - pending_debits >= estimated_cost</code>), per-wallet mutex, idempotency on <code>debit()</code>, 5-min withdrawal timelock, decimal precision (6 decimals USDC), fee only on success</li>
-  <li><strong>Phase 3:</strong> No changes to current stub design. Blocked on prover library.</li>
-  <li><strong>Phase 4:</strong> Add slashing enforcement once phase 2 contract is live</li>
-  <li><strong>Phase 5:</strong> Audit the unknown Solana address before re-enabling. Add <code>SOLANA_ENABLED</code> env gate.</li>
+  <li><strong>No pre-deposit</strong> — caller does one <code>usdc.approve(LatchkeyBilling, large_amount)</code>, then uses the proxy immediately</li>
+  <li><strong>Off-chain accounting</strong> — <code>wallet_state.accrued_usd</code> tracks debt in dollars (canonical unit); conversion to USDC atomic units only at pull time</li>
+  <li><strong>Crash-safe pull</strong> — sign tx locally → persist (snapshot + hash + raw) → broadcast. On restart: re-broadcast the saved raw tx (same nonce+payload = same hash = idempotent)</li>
+  <li><strong>Hot path is RPC-free</strong> — blocked check + known-wallet bypass; first-seen wallets do one allowance read then cache</li>
+  <li><strong>Activation gate</strong> — all Phase 2 behaviour keyed on <code>BILLING_CONTRACT_ADDRESS</code>; empty = Phase 1 mock (prod is safe until deploy)</li>
 </ul>
 
-<h2>How to verify yourself</h2>
+<h2>What to do when funding arrives</h2>
 
-<div class="step"><div class="num">1</div><div class="step-body"><strong>Use Claude Code through the proxy</strong><pre>source .env.client
-claude</pre><p>Send any message. The admin dashboard auto-refreshes every 30s — wait a moment and watch the token count rise.</p>
-<p>Quick non-interactive test (verified working — response: <code>hello</code>, delta: 6 tokens via claude-opus-4-8):</p>
-<pre>ANTHROPIC_BASE_URL=https://api.latchkey.me \
-ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY \
-claude -p "say the word hello and nothing else"</pre></div></div>
+<div class="note">Send ~0.05 Base Sepolia ETH to <code>0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034</code>, then I'll run everything below automatically.</div>
 
-<div class="step"><div class="num">2</div><div class="step-body"><strong>Smoke-test the proxy</strong><pre>curl https://api.latchkey.me/health
-curl https://api.latchkey.me/admin/usage</pre></div></div>
+<h3>1. Deploy the contract</h3>
+<pre>cd packages/contracts
+USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e \
+TREASURY_ADDRESS=0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 \
+PROXY_ADDRESS=0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 \
+~/.foundry/bin/forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org \
+  --private-key 0x9c190254f45fd2e9e81dabd456b2ab994e412349daa24877148146909d31de66 \
+  --broadcast</pre>
 
-<div class="step"><div class="num">3</div><div class="step-body"><strong>Run E2E tests (local — no credentials needed)</strong><pre>cd packages/e2e && npx playwright test</pre></div></div>
+<h3>2. Wire the contract address</h3>
+<pre><span class="c"># In packages/proxy/.env:</span>
+BILLING_CONTRACT_ADDRESS=&lt;deployed address&gt;
 
-<div class="step"><div class="num">4</div><div class="step-body"><strong>Run E2E tests (production)</strong><pre>cd packages/e2e
-E2E_PROXY_URL=https://api.latchkey.me \
-E2E_ADMIN_URL=https://payprompt-admin.vercel.app \
-E2E_BEARER_TOKEN=$(cd ../proxy && ~/.bun/bin/bun -e \
-  "import{encodeBearerToken}from'./src/middleware/auth.ts';\
-   process.stdout.write(await encodeBearerToken(\
-   '0x6007ce7814ba19c6db28ed536e710ae7a10454d2f599356beaa6a71f91ffa7f1'))") \
-npx playwright test</pre></div></div>
+<span class="c"># Deploy proxy + sync env to server:</span>
+ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 "cd /root/latchkey && git pull origin ma/4 && ..."
+bash deploy/sync-env.sh</pre>
 
-<div class="step"><div class="num">5</div><div class="step-body"><strong>Deploy after code changes</strong><pre>git push origin ma/3
-ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 \
-  "cd /root/latchkey && git pull origin ma/3 && \
-   /root/.bun/bin/bun install --frozen-lockfile && \
-   systemctl restart latchkey-proxy"
-bash deploy/sync-env.sh   <span class="c"># always run this after restart</span></pre></div></div>
+<h3>3. Run on-chain E2E</h3>
+<pre><span class="c"># Fund test wallet (already has 15 USDC, needs gas for approve())
+# Then approve:</span>
+cast send 0x036CbD53842c5426634e7929541eC2318f3dCF7e \
+  "approve(address,uint256)" &lt;BILLING_CONTRACT&gt; 10000000 \
+  --private-key 0x6007ce78... --rpc-url https://sepolia.base.org
 
-<hr>
+<span class="c"># Drive requests until $0.10 accrued, watch pull tx appear on-chain</span>
+source .env.client && claude -p "say hello"  <span class="c"># repeat ~10x</span></pre>
 
-<h2>Infrastructure reference</h2>
+<h3>4. Verify the admin dashboard</h3>
+<p>After a pull fires, the <code>WalletTable</code> at <a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> shows the accrued debt and lifetime-pulled columns.</p>
+
+<h2>Infrastructure</h2>
 <table>
   <tr><th>Resource</th><th>Details</th></tr>
-  <tr><td>Proxy</td><td><a href="https://api.latchkey.me">api.latchkey.me</a> · Servury VPS 151.247.22.152</td></tr>
-  <tr><td>Admin</td><td><a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a> · Vercel <code>payprompt-admin</code></td></tr>
-  <tr><td>GitHub</td><td><a href="https://github.com/marvinmarnold/latchkey/tree/ma/3">marvinmarnold/latchkey · ma/3</a></td></tr>
-  <tr><td>SSH</td><td><code>ssh -i ~/.ssh/id_ed25519 root@151.247.22.152</code></td></tr>
-  <tr><td>Balance check</td><td>Phase 1 mock mode — <code>BALANCE_CONTRACT_ADDRESS=</code> (empty)</td></tr>
-  <tr><td>Solana auth</td><td>Disabled — <code>verifyBearerToken</code> returns 401 for base58 addresses</td></tr>
+  <tr><td>Proxy</td><td><a href="https://api.latchkey.me">api.latchkey.me</a> · still running Phase 1</td></tr>
+  <tr><td>Admin</td><td><a href="https://payprompt-admin.vercel.app">payprompt-admin.vercel.app</a></td></tr>
+  <tr><td>Branch</td><td><a href="https://github.com/marvinmarnold/latchkey/tree/ma/4">ma/4</a> — PR into main after on-chain E2E passes</td></tr>
+  <tr><td>Operator wallet</td><td class="mono">0x80d1B5970aABDDC7eC91987BC4E54857b7f8D034 ← needs gas</td></tr>
+  <tr><td>Caller wallet</td><td class="mono">0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89 · 0.025 ETH + 15 USDC ✓</td></tr>
+  <tr><td>USDC (Base Sepolia)</td><td class="mono">0x036CbD53842c5426634e7929541eC2318f3dCF7e</td></tr>
 </table>
-
-<div class="note">Token expires 2026-06-30. Regenerate: <code>cd packages/proxy && ~/.bun/bin/bun -e "import{encodeBearerToken}from'./src/middleware/auth.ts';process.stdout.write(await encodeBearerToken('0x6007ce...fa7f1',Math.floor(Date.now()/1000)+30*86400))"</code></div>
 
 </body>
 </html>
