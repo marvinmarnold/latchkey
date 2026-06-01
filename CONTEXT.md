@@ -53,13 +53,22 @@ A Provider caught serving a different model than declared is slashed and deliste
 1% of each pull settlement, taken at the smart contract level. Callers pay the Provider's listed token price; `LatchkeyBilling.pull()` routes 99% to the proxy operator and 1% to the protocol treasury. No spread or markup on top of Provider pricing.
 
 ## Stake
-USDC deposited by a Provider before listing on the Marketplace. Slashed (partially or fully forfeited) only for provable fraud — serving a different model than declared, or overbilling. Downtime is not a slashable offence; it affects the Provider's Router score instead. No protocol token in v1.
+USDC deposited by a **Provider** before listing on the Marketplace. Slashed (partially or fully forfeited) only for provable fraud — serving a different model than declared, or overbilling. Downtime is not a slashable offence; it affects the Provider's Router score instead. No protocol token in v1. _Not_ to be used for the Caller side — a Caller posts a **Caller Deposit**, which is never slashed.
+
+## Caller Deposit
+> **Status: not yet built.** The deployed contract (`LatchkeyBilling`) still uses the allowance-gate model (ADR 0004). This definition describes the target architecture.
+
+USDC a **Caller** deposits into the billing contract before using the proxy — credit collateral, never a fraud bond and never slashed. Minimum deposit **$1**. It bounds how much inference the proxy will front before settling on-chain: at any moment a Caller may have at most `min(deposit − used, PULL_THRESHOLD_USD)` of unsettled (fronted) usage — the smaller of their remaining deposit and the pull threshold; beyond that the proxy settles or returns 402. The Caller withdraws unused deposit subject to outstanding **Accrued Debt** being settled first. Distinct from a Provider's slashable Stake in actor, purpose, and fate.
 
 ## Session
-The active billing period for a Caller — the window during which the Caller has a valid USDC allowance approved for the `LatchkeyBilling` contract and their wallet is not blocked. No discrete on-chain open/close event; the Session is a soft construct defined by the presence of a sufficient allowance. Inference requests accrue debt off-chain; when debt crosses the **Pull Threshold**, the proxy settles on-chain. If an on-chain pull fails three consecutive times, the wallet is blocked and the next request returns HTTP 402.
+> **Status: the Session definition below reflects the target Caller Deposit model (not yet built). The deployed proxy uses an allowance gate; see ADR 0004.**
+
+The active billing period for a Caller — the window during which the Caller has a sufficient **Caller Deposit** held by the billing contract and their wallet is not blocked. No discrete on-chain open/close event; the Session is a soft construct defined by the presence of a sufficient deposit. Inference requests accrue debt off-chain and the proxy settles on-chain against the deposit (see **Caller Deposit** for the `min(deposit − used, PULL_THRESHOLD_USD)` fronting cap, and **Pull Threshold**). If an on-chain settlement fails three consecutive times, the wallet is blocked and the next request returns HTTP 402.
+
+(Historical note: v1 as deployed defines the Session by a sufficient USDC *allowance* rather than a deposit; the move to a Caller Deposit is recorded in ADR 0004 and not yet built.)
 
 ## Pull Threshold
-The off-chain accrued debt level (default **$0.10**) that triggers an on-chain settlement pull. The proxy accumulates a Caller's request costs in SQLite; once the total crosses this threshold, a background worker calls `LatchkeyBilling.pull()` to move USDC from the Caller's wallet to the proxy. The threshold exists to batch small payments and avoid high on-chain transaction volume.
+The off-chain accrued debt level (default **$0.01** for testing, configurable via `PULL_THRESHOLD_USD`; canonical default in `packages/proxy/src/config.ts`) that triggers an on-chain settlement pull. The proxy accumulates a Caller's request costs in SQLite; once the total crosses this threshold, a background worker calls `LatchkeyBilling.pull()` to move USDC from the Caller's wallet to the proxy. The threshold exists to batch small payments and avoid high on-chain transaction volume.
 
 ## Accrued Debt
 The dollar-denominated sum of request costs billed to a Caller's wallet since the last successful on-chain settlement. Stored in `wallet_state.accrued_usd`. Dollars are the canonical internal unit; conversion to USDC atomic units (6 decimals) happens only at pull time.
