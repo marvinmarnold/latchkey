@@ -85,7 +85,7 @@ export async function verifyBearerToken(encoded: string): Promise<{ callerAddres
 /** Generate an EVM bearer token (EIP-712). */
 export async function encodeBearerToken(
   privateKey: `0x${string}`,
-  expiry: number = Math.floor(Date.now() / 1000) + 3600,
+  expiry: number = Math.floor(Date.now() / 1000) + 30 * 24 * 3600,
 ): Promise<string> {
   const account = privateKeyToAccount(privateKey)
   const nonce = randomBytes(16).toString('hex')

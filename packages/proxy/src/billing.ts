@@ -70,6 +70,16 @@ export function extractUsageFromAnthropicStream(
         }
         controller.enqueue(chunk)
       },
+      flush() {
+        if (!buf.startsWith('data: ')) return
+        try {
+          const data = JSON.parse(buf.slice(6)) as Record<string, unknown>
+          if (data.type === 'message_delta') {
+            const outputTokens = (data.usage as { output_tokens?: number } | undefined)?.output_tokens ?? 0
+            onUsage({ prompt_tokens: inputTokens, completion_tokens: outputTokens, total_tokens: inputTokens + outputTokens })
+          }
+        } catch { /* ignore */ }
+      },
     }),
   )
   return { stream: transformed }

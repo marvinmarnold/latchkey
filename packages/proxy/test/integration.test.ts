@@ -21,9 +21,14 @@ let mockServer: Elysia
 let proxyServer: ReturnType<typeof buildApp>
 let token: string
 let db: ReturnType<typeof openDb>
+let prevBalanceContractAddress: string | undefined
+let prevBillingContractAddress: string | undefined
 
 beforeAll(async () => {
-  // Clear both contract addresses so tests run in Phase 1 mock mode
+  // Clear both contract addresses so tests run in Phase 1 mock mode.
+  // Save originals so afterAll can restore them for any other suites in this process.
+  prevBalanceContractAddress = process.env.BALANCE_CONTRACT_ADDRESS
+  prevBillingContractAddress = process.env.BILLING_CONTRACT_ADDRESS
   process.env.BALANCE_CONTRACT_ADDRESS = ''
   process.env.BILLING_CONTRACT_ADDRESS = ''
   token = await encodeBearerToken(TEST_KEY)
@@ -65,6 +70,8 @@ afterAll(() => {
   proxyServer?.stop()
   mockServer?.stop()
   closeDb(db)
+  process.env.BALANCE_CONTRACT_ADDRESS = prevBalanceContractAddress
+  process.env.BILLING_CONTRACT_ADDRESS = prevBillingContractAddress
 })
 
 describe('OpenAI endpoint', () => {

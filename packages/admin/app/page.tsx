@@ -26,19 +26,26 @@ export default function AdminPage() {
     fetch(`${PROXY}/admin/wallets`)
       .then(r => { if (!r.ok) throw new Error(`wallets HTTP ${r.status}`); return r.json() as Promise<WalletRow[]> })
       .then(async rows => {
-        // Enrich each row with its live allowance (best-effort — silently skipped on failure)
-        const enriched = await Promise.all(
-          rows.map(async row => {
-            try {
-              const res = await fetch(`${PROXY}/admin/allowance/${row.address}`)
-              if (res.ok) {
-                const { allowance_atomic } = await res.json() as { allowance_atomic: string }
-                return { ...row, allowance_atomic }
-              }
-            } catch { /* non-fatal */ }
-            return row
-          })
-        )
+        // Enrich each row with its live allowance (best-effort — silently skipped on failure).
+        // Cap at 8 concurrent RPC calls to avoid spiking the upstream allowance endpoint.
+        const concurrency = 8
+        const enriched: WalletRow[] = []
+        for (let i = 0; i < rows.length; i += concurrency) {
+          const chunk = rows.slice(i, i + concurrency)
+          const chunkOut = await Promise.all(
+            chunk.map(async row => {
+              try {
+                const res = await fetch(`${PROXY}/admin/allowance/${row.address}`)
+                if (res.ok) {
+                  const { allowance_atomic } = await res.json() as { allowance_atomic: string }
+                  return { ...row, allowance_atomic }
+                }
+              } catch { /* non-fatal */ }
+              return row
+            })
+          )
+          enriched.push(...chunkOut)
+        }
         setWallets(enriched)
       })
       .catch((e: Error) => setError(e.message))

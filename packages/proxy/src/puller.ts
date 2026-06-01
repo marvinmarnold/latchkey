@@ -109,7 +109,12 @@ export async function processPulls(db: Database, chain: PullChain, opts: PullOpt
 
 /** Start the background pull worker. Returns the interval handle. */
 export function startPullWorker(db: Database, chain: PullChain, opts: PullOpts = {}, intervalMs = 30_000) {
+  let inFlight = false
   return setInterval(() => {
-    processPulls(db, chain, opts).catch(e => console.warn('[puller]', (e as Error).message))
+    if (inFlight) return
+    inFlight = true
+    processPulls(db, chain, opts)
+      .catch(e => console.warn('[puller]', (e as Error).message))
+      .finally(() => { inFlight = false })
   }, intervalMs)
 }

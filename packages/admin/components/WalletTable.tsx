@@ -22,6 +22,11 @@ function truncateAddr(addr: string) {
 
 function fmtUsd(n: number) { return `$${n.toFixed(6)}` }
 
+function fmtTimestamp(ts: number | null) {
+  if (!ts) return '–'
+  return new Date(ts * 1000).toLocaleString()
+}
+
 function fmtAllowance(atomic: string | undefined) {
   if (!atomic) return '–'
   const n = Number(atomic) / 1_000_000
@@ -38,6 +43,7 @@ export default function WalletTable({ rows }: { rows: WalletRow[] }) {
           <th style={thStyle}>Wallet</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Accrued (off-chain)</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Lifetime pulled</th>
+          <th style={{ ...thStyle, textAlign: 'right' }}>Last pull</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Allowance remaining</th>
           <th style={{ ...thStyle, textAlign: 'right' }}>Failures</th>
           <th style={thStyle}>Last pull tx</th>
@@ -50,6 +56,7 @@ export default function WalletTable({ rows }: { rows: WalletRow[] }) {
             <td style={{ ...tdStyle, color: '#a5f3fc' }} title={r.address}>{truncateAddr(r.address)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtUsd(r.accrued_usd)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtUsd(r.total_pulled_usd)}</td>
+            <td style={{ ...tdStyle, textAlign: 'right', color: '#a3a3a3', fontSize: 11 }}>{fmtTimestamp(r.last_pull_at)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{fmtAllowance(r.allowance_atomic)}</td>
             <td style={{ ...tdStyle, textAlign: 'right' }}>{r.pull_failure_count}</td>
             <td style={tdStyle}>
