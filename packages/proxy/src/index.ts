@@ -83,14 +83,16 @@ export function buildApp(db: Database) {
         const { callerAddress, chain } = await verifyBearerToken(encoded)
         // Read at request time so test env overrides take effect.
         const billingContract = process.env.BILLING_CONTRACT_ADDRESS || ''
-        if (billingContract) {
-          // Phase 2: RPC-free hot path — blocked check + first-seen allowance gate.
+        if (billingContract && chain !== 'solana') {
+          // Phase 2: EVM wallets only — RPC-free blocked check + first-seen allowance gate.
+          // Solana wallets skip this and fall through to mock mode below (Phase 5: on-chain
+          // Solana billing is not yet wired; usage is still accrued for dashboard visibility).
           await assertWalletAllowed(db, callerAddress, {
             readAllowance: (a) => readUsdcAllowance(a, billingContract),
             thresholdAtomic: PULL_THRESHOLD_ATOMIC,
           })
         } else {
-          // Phase 1 mock mode.
+          // Phase 1 mock mode (EVM without billing contract) or any Solana wallet.
           await assertSufficientBalance(callerAddress, chain)
         }
         return { callerAddress }
@@ -213,5 +215,9 @@ if (import.meta.main) {
     console.log(`[puller] pull-payment worker started (threshold $${PULL_THRESHOLD_USD}, contract ${billingContractAtStartup})`)
   } else {
     console.log('[puller] disabled — BILLING_CONTRACT_ADDRESS/PROXY_PRIVATE_KEY not set (Phase 1 mock mode)')
+  }
+  // Phase 5: Solana auth is active. On-chain billing requires SOLANA_BILLING_ENABLED=true.
+  if (process.env.SOLANA_BILLING_ENABLED !== 'true') {
+    console.log('[solana] auth enabled; billing in mock mode — set SOLANA_BILLING_ENABLED=true to enforce real SPL balance checks')
   }
 }

@@ -1,16 +1,66 @@
 # Claude Instructions — Latchkey
 
-## Review rule — always verify with DeepSeek before finishing a phase
+## Phase completion protocol (mandatory for every phase)
 
-Before declaring any phase of work done, call the DeepSeek API to review the implementation:
+When finishing any phase of work, always follow these steps in order. Do NOT skip any step and do NOT wait for the user to ask.
+
+### 1. TDD (Red → Green)
+Build every phase test-first: write failing tests first, then implement until they pass. No feature code without a failing test first.
+
+### 2. DeepSeek review
+After all tests are green, call the DeepSeek API to review the implementation:
 ```bash
 curl -s https://api.deepseek.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $(grep DEEPSEEK_API_KEY packages/proxy/.env | cut -d= -f2)" \
-  -d '{"model":"deepseek-chat","temperature":0.3,"messages":[{"role":"system","content":"You are a senior backend engineer. Be direct, flag real problems only."},{"role":"user","content":"<describe what was just built and ask for review>"}]}' \
+  -d '{"model":"deepseek-chat","temperature":0.3,"messages":[{"role":"system","content":"You are a senior backend engineer. Be direct, flag real problems only."},{"role":"user","content":"<describe what was just built>"}]}' \
   | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])"
 ```
-Go back and forth until agreement is reached. Store any phase-specific improvements in `docs/superpowers/plans/`.
+Go back and forth until agreement is reached. Fix real findings before continuing.
+
+### 3. Open a PR
+Push branch, open a GitHub PR with a clear title and summary. Wait for CodeRabbit to post its automated review (usually within a few minutes of the push).
+
+### 4. ChatGPT independent review
+Use the OpenAI API to review the same diff independently — separate from CodeRabbit. Compare both sets of findings:
+```bash
+# Get the diff for review
+git diff main...HEAD -- '*.ts' '*.sol' | head -500
+```
+Then call OpenAI (capture the diff first, then embed it):
+```bash
+DIFF=$(git diff main...HEAD -- '*.ts' | head -500)
+OPENAI_KEY=$(grep OPENAI_API_KEY packages/proxy/.env | cut -d= -f2)
+curl -s https://api.openai.com/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $OPENAI_KEY" \
+  -d "{\"model\":\"gpt-4o\",\"temperature\":0.3,\"messages\":[{\"role\":\"system\",\"content\":\"You are a senior backend engineer reviewing a TypeScript pull request. Be direct, flag real correctness and security issues only. Ignore style. Max 300 words.\"},
+{\"role\":\"user\",\"content\":$(echo "$DIFF" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}]}" \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['choices'][0]['message']['content'])"
+```
+
+### 5. Consensus and PR comments
+Compare CodeRabbit and ChatGPT findings. For each finding:
+- If both agree it's valid: fix it
+- If one flags it and it's clearly correct: fix it
+- If stale/already-fixed/intentional-design: skip it
+- Post a reply comment on every CodeRabbit inline comment explaining what was done (fixed or skipped with reason)
+
+### 6. Iterate
+Keep fixing and re-running `bun test` + E2E until all tests pass and all meaningful review findings are addressed.
+
+### 7. Deploy
+```bash
+bash deploy/sync-env.sh
+ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 "cd /root/latchkey && git fetch origin && git checkout -B ma/<N> origin/ma/<N> && systemctl restart latchkey-proxy"
+```
+Run production E2E to confirm green.
+
+---
+
+## Review rule — always verify with DeepSeek before finishing a phase
+
+Before declaring any phase of work done, call the DeepSeek API to review the implementation (see Phase completion protocol above).
 
 Do NOT add net-new features (encryption, retries, rate limits, security hardening) proactively. The priority is getting the core architecture right. These can be layered on later without refactoring.
 
@@ -63,10 +113,10 @@ All four steps are required for **app/provider vars** (API keys the proxy uses).
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 1 — Proxy | ✅ deployed, tested | EVM-only auth. `BALANCE_CONTRACT_ADDRESS=` (mock) |
-| 2 — Smart contracts | ⚠ contract deployed, not wired | `PaypromptBalance.sol` on Base Sepolia. Balance check bypassed in phase 1 |
-| 3 — zkTLS | 🔲 stub only | Proof queue exists; no prover integrated |
+| 2 — Pull-payment billing | ✅ deployed, PR #2 open | `LatchkeyBilling.sol` on Base Sepolia; pull worker active ($0.01 threshold) |
+| 3 — zkTLS | 🔲 stub only | Proof queue exists; no prover integrated (no production library available mid-2026) |
 | 4 — Fingerprinting | ✅ running | Logs mismatches; no slashing yet |
-| 5 — Solana rail | 🔲 disabled | Auth disabled phase 1. Re-enable in `middleware/auth.ts` |
+| 5 — Solana rail | 🔄 in progress | Enabling ed25519 auth; on-chain Solana billing is Phase 5+ |
 
 ---
 
@@ -80,5 +130,5 @@ All four steps are required for **app/provider vars** (API keys the proxy uses).
 | E2E tests | `packages/e2e/` |
 | Admin dashboard | `packages/admin/` → https://payprompt-admin.vercel.app |
 | Proxy entry | `packages/proxy/src/index.ts` |
-| Auth (EVM token verify) | `packages/proxy/src/middleware/auth.ts` |
+| Auth (EVM + Solana token verify) | `packages/proxy/src/middleware/auth.ts` |
 | Balance check | `packages/proxy/src/middleware/balance.ts` |

@@ -1,7 +1,7 @@
 // packages/proxy/test/integration.test.ts
 import { describe, it, expect, beforeAll, afterAll } from 'bun:test'
 import { Elysia } from 'elysia'
-import { encodeBearerToken } from '../src/middleware/auth'
+import { encodeBearerToken, encodeSolanaBearerToken } from '../src/middleware/auth'
 import { openDb, closeDb } from '../src/db'
 import { buildApp } from '../src/index'
 
@@ -299,5 +299,83 @@ describe('Upstream error passthrough', () => {
     })
     expect(res.status).toBe(429)
     expect(res.headers.get('retry-after')).toBe('30')  // RED: currently null
+  })
+})
+
+describe('Solana auth', () => {
+  // Phase 5: Solana wallets use ed25519 bearer tokens and run in mock billing mode.
+  // They are routed the same as EVM Phase-1 regardless of BILLING_CONTRACT_ADDRESS.
+  const SOL_PROXY_PORT = 18088
+  const SOL_MOCK_PORT = 18089
+  const SOLANA_SEED = new Uint8Array(32).fill(42)
+  let solProxy: ReturnType<typeof buildApp>
+  let solMock: Elysia
+  let solDb: ReturnType<typeof openDb>
+  let solToken: string
+
+  beforeAll(async () => {
+    solToken = await encodeSolanaBearerToken(SOLANA_SEED)
+
+    solMock = new Elysia()
+      .post('/v1/chat/completions', () => ({
+        id: 'sol-test', object: 'chat.completion', model: 'test/SolModel',
+        choices: [{ index: 0, message: { role: 'assistant', content: 'Hello Solana!' }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 5, completion_tokens: 3, total_tokens: 8 },
+      }))
+    solMock.listen(SOL_MOCK_PORT)
+
+    solDb = openDb(':memory:')
+    solDb.run(`INSERT INTO providers (id, name) VALUES ('sol-p1', 'SolProvider')`)
+    solDb.run(`INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million)
+      VALUES ('sol-l1', 'sol-p1', 'test/SolModel', 'openai', 'http://localhost:${SOL_MOCK_PORT}/v1', 270, 1100)`)
+    solProxy = buildApp(solDb)
+    solProxy.listen(SOL_PROXY_PORT)
+  })
+
+  afterAll(() => {
+    solProxy?.stop()
+    solMock?.stop()
+    closeDb(solDb)
+  })
+
+  it('accepts a Solana bearer token in Phase 1 mock mode', async () => {
+    const res = await fetch(`http://localhost:${SOL_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${solToken}` },
+      body: JSON.stringify({ model: 'test/SolModel', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    expect(res.status).toBe(200)
+    const json = await res.json() as { choices: Array<{ message: { content: string } }> }
+    expect(json.choices[0].message.content).toBe('Hello Solana!')
+  })
+
+  it('accepts a Solana token even when BILLING_CONTRACT_ADDRESS is set (skips EVM gate)', async () => {
+    const prevBilling = process.env.BILLING_CONTRACT_ADDRESS
+    process.env.BILLING_CONTRACT_ADDRESS = '0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7'
+    try {
+      const res = await fetch(`http://localhost:${SOL_PROXY_PORT}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${solToken}` },
+        body: JSON.stringify({ model: 'test/SolModel', messages: [{ role: 'user', content: 'Hi' }] }),
+      })
+      expect(res.status).toBe(200)
+    } finally {
+      process.env.BILLING_CONTRACT_ADDRESS = prevBilling
+    }
+  })
+
+  it('accrues usage under the exact Solana base58 address in billing_log', async () => {
+    await fetch(`http://localhost:${SOL_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${solToken}` },
+      body: JSON.stringify({ model: 'test/SolModel', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    // Derive the expected address from the seed so the assertion is deterministic.
+    const { getPublicKeyAsync } = await import('@noble/ed25519')
+    const bs58mod = await import('bs58')
+    const pubKey = await getPublicKeyAsync(SOLANA_SEED)
+    const expectedAddress = bs58mod.default.encode(pubKey)
+    const rows = solDb.query<{ caller_address: string }, []>('SELECT caller_address FROM billing_log').all()
+    expect(rows.some(r => r.caller_address === expectedAddress)).toBe(true)
   })
 })
