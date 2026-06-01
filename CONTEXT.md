@@ -1,4 +1,4 @@
-# Payprompt LLM Marketplace — Glossary
+# Latchkey LLM Marketplace — Glossary
 
 ## Marketplace
 A listing marketplace where independent Providers register their own inference endpoints and prices. The platform routes requests and handles billing but never holds upstream API keys. Providers compete on price (v1) and eventually on quality heuristics (v2).
@@ -16,7 +16,7 @@ Two listing modes:
 The Marketplace does not control or custody Provider infrastructure.
 
 ## Listing
-A single model offered by a Provider at a specific price. Carries its own endpoint URL, upstream format, API key (if any), input/output prices, context length, provider-side model ID, reliability score, and active flag. The unit of routing: the Router selects a Listing, not a Provider. A Listing is only routable when both its own active flag and its Provider's active flag are true.
+A single model offered by a Provider at a specific price. Carries its own endpoint URL, upstream format, API key (if any), input/output prices (in **dollars per million tokens**), context length, provider-side model ID, reliability score, and active flag. The unit of routing: the Router selects a Listing, not a Provider. A Listing is only routable when both its own active flag and its Provider's active flag are true.
 
 `upstream_format` declares what wire format the provider endpoint speaks: `openai` (default — covers DeepSeek, Together AI, self-hosted vLLM, etc.) or `anthropic`. The forwarder uses this to decide whether to send the internal OpenAI-format request as-is or convert it to Anthropic format at egress.
 
@@ -50,13 +50,19 @@ Two mechanisms run in combination:
 A Provider caught serving a different model than declared is slashed and delisted. Slashed stake funds dispute resolution.
 
 ## Protocol Fee
-1% of each Session settlement, taken at the smart contract level before paying out to the Provider. Callers pay the Provider's listed token price; the contract routes 99% to the Provider and 1% to the protocol treasury. No spread or markup on top of Provider pricing.
+1% of each pull settlement, taken at the smart contract level. Callers pay the Provider's listed token price; `LatchkeyBilling.pull()` routes 99% to the proxy operator and 1% to the protocol treasury. No spread or markup on top of Provider pricing.
 
 ## Stake
 USDC deposited by a Provider before listing on the Marketplace. Slashed (partially or fully forfeited) only for provable fraud — serving a different model than declared, or overbilling. Downtime is not a slashable offence; it affects the Provider's Router score instead. No protocol token in v1.
 
 ## Session
-The active billing period for a Caller — the window between depositing USDC into the Marketplace contract for their wallet address and that balance reaching zero (or being withdrawn). No discrete on-chain open/close event; the Session is a soft construct defined by the presence of a funded balance. Inference requests debit against the balance without per-request on-chain transactions. If balance hits zero mid-session, the next request returns HTTP 402.
+The active billing period for a Caller — the window during which the Caller has a valid USDC allowance approved for the `LatchkeyBilling` contract and their wallet is not blocked. No discrete on-chain open/close event; the Session is a soft construct defined by the presence of a sufficient allowance. Inference requests accrue debt off-chain; when debt crosses the **Pull Threshold**, the proxy settles on-chain. If an on-chain pull fails three consecutive times, the wallet is blocked and the next request returns HTTP 402.
+
+## Pull Threshold
+The off-chain accrued debt level (default **$0.10**) that triggers an on-chain settlement pull. The proxy accumulates a Caller's request costs in SQLite; once the total crosses this threshold, a background worker calls `LatchkeyBilling.pull()` to move USDC from the Caller's wallet to the proxy. The threshold exists to batch small payments and avoid high on-chain transaction volume.
+
+## Accrued Debt
+The dollar-denominated sum of request costs billed to a Caller's wallet since the last successful on-chain settlement. Stored in `wallet_state.accrued_usd`. Dollars are the canonical internal unit; conversion to USDC atomic units (6 decimals) happens only at pull time.
 
 ## Proof of Inference
 The mechanism by which the Marketplace verifies that a Provider made a real upstream LLM request and that billing reflects actual token usage.
@@ -67,17 +73,15 @@ The mechanism by which the Marketplace verifies that a Provider made a real upst
 ## Chain
 The blockchain network used for on-chain settlement, staking, and balance tracking.
 
-- **v1:** Base (EVM). Native USDC, mature x402 tooling, EIP-712 signing supported across major wallets.
+- **v1:** Base (EVM). Native USDC, EIP-712 signing supported across major wallets.
 - **v2:** Solana added as a second funding rail. Callers fund whichever chain matches their wallet; the proxy checks the correct contract before routing. Agents are chain-unaware.
 
 ## Bearer Token
-The credential Callers use to authenticate requests. Derived by signing a structured message `{address, expiry, nonce}` with the Caller's wallet private key — no gas, no on-chain transaction, no registration step. The signature itself is the token.
+The credential Callers use to authenticate requests. Derived by signing a structured message `{address, expiry, nonce}` with the Caller's EVM private key — no gas, no on-chain transaction, no registration step. The signature itself is the token.
 
-The proxy recovers the signer address from the signature on every request, checks the Caller's on-chain USDC balance for that address, and proceeds if funded. If balance is zero, returns HTTP 402.
+On each request, the proxy recovers the signer address from the signature, checks that the wallet is not blocked and (for first-seen wallets) has a sufficient USDC allowance approved for `LatchkeyBilling`. If blocked or lacking allowance, returns HTTP 402. The allowance check is cached after the first request — no RPC on the steady-state hot path.
 
-Callers fund their balance on-chain independently. Token expiry limits the blast radius of a leaked token — the attacker can only drain whatever USDC is deposited for that address.
-
-Passed in request headers using the convention of the Caller's API Format: `Authorization: Bearer <token>` (OpenAI) or `x-api-key: <token>` (Anthropic).
+Token expiry limits the blast radius of a leaked token. Passed in request headers using the convention of the Caller's API Format: `Authorization: Bearer <token>` (OpenAI) or `x-api-key: <token>` (Anthropic).
 
 ## Session Key
 A keypair generated by the Caller and authorised via a wallet signature. Used when the Caller wants to keep their root wallet cold — the session keypair signs requests instead of the root wallet. The authorisation is submitted on-chain. Optional; Callers who are comfortable signing at runtime can use a Bearer Token derived from their root wallet directly.
