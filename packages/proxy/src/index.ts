@@ -8,7 +8,7 @@ import { translateOpenAIToAnthropic, openAIStreamToAnthropicStream } from './for
 import { selectListing, penaliseListing } from './router'
 import { forwardToProvider } from './forwarder'
 import { discoverModels } from './discovery'
-import { extractUsageFromStream, computeCost, logUsage } from './billing'
+import { extractUsageFromStream, extractUsageFromAnthropicStream, computeCost, logUsage } from './billing'
 import { enqueueProofJob, startProofWorker } from './zktls'
 import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
 import { queryUsage, queryWallets, queryAllowance } from './admin'
@@ -33,10 +33,14 @@ function handleUpstreamError(
   const msg = e instanceof Error ? e.message : 'Provider error'
 
   // Rate-limit and overload: pass status through, do NOT penalise.
+  // Also forward Retry-After so clients (e.g. Claude Code) know exactly how long to wait.
   if (upstreamStatus === 429 || upstreamStatus === 529) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const retryAfter = (e as { retryAfter?: string | null }).retryAfter
+    if (retryAfter) headers['Retry-After'] = retryAfter
     return new Response(
       JSON.stringify({ error: { type: 'rate_limit_error', message: msg } }),
-      { status: upstreamStatus, headers: { 'Content-Type': 'application/json' } },
+      { status: upstreamStatus, headers },
     )
   }
 
@@ -140,19 +144,28 @@ export function buildApp(db: Database) {
         const msgProviderHost = new URL(listing.endpoint).hostname
         if (isStreaming && stream) {
           let msgBilled = false
-          const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+          const onUsage = (usage: { prompt_tokens: number; completion_tokens: number }) => {
             if (msgBilled) return
             msgBilled = true
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
             const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
             accrue(db, callerAddress, cost)
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
-          })
-          const anthropicStream = openAIStreamToAnthropicStream(billedStream)
+          }
+          // Anthropic upstream: stream is already Anthropic SSE — pass through unchanged.
+          // OpenAI upstream: extract OpenAI-format usage and convert to Anthropic SSE.
+          let responseStream: ReadableStream<Uint8Array>
+          if (listing.upstream_format === 'anthropic') {
+            const { stream: billedStream } = extractUsageFromAnthropicStream(stream, onUsage)
+            responseStream = billedStream
+          } else {
+            const { stream: billedStream } = extractUsageFromStream(stream, onUsage)
+            responseStream = openAIStreamToAnthropicStream(billedStream)
+          }
           set.headers['Content-Type'] = 'text/event-stream'
           set.headers['Cache-Control'] = 'no-cache'
           set.headers['Connection'] = 'keep-alive'
-          return new Response(anthropicStream)
+          return new Response(responseStream)
         }
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
