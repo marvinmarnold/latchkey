@@ -1,6 +1,7 @@
 import { keccak256 } from 'viem'
 import type { Database } from 'bun:sqlite'
 import type { WalletState } from './wallet'
+import { DEFAULT_PULL_THRESHOLD_USD } from './config'
 
 /**
  * Chain seam for the pull worker. Kept tiny and injectable so the whole
@@ -19,7 +20,7 @@ export interface PullChain {
 }
 
 export interface PullOpts {
-  thresholdUsd?: number // accrued debt that triggers a pull (default 0.10)
+  thresholdUsd?: number // accrued debt that triggers a pull (default DEFAULT_PULL_THRESHOLD_USD)
   scale?: number        // token atomic units per dollar (default 1e6 = USDC 6 decimals)
   maxFailures?: number  // consecutive failures before blocking (default 3)
 }
@@ -57,7 +58,7 @@ function fail(db: Database, address: string, maxFailures: number): void {
  * Step 1 reconciles any in-flight pull (crash recovery); step 2 starts new pulls.
  */
 export async function processPulls(db: Database, chain: PullChain, opts: PullOpts = {}): Promise<void> {
-  const thresholdUsd = opts.thresholdUsd ?? 0.10
+  const thresholdUsd = opts.thresholdUsd ?? DEFAULT_PULL_THRESHOLD_USD
   const scale = opts.scale ?? 1_000_000
   const maxFailures = opts.maxFailures ?? 3
 

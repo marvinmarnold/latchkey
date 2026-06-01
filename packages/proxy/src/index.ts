@@ -15,6 +15,7 @@ import { queryUsage, queryWallets, queryAllowance } from './admin'
 import { accrue, assertWalletAllowed } from './wallet'
 import { startPullWorker } from './puller'
 import { makePullChain } from './pullchain'
+import { PULL_SCALE, PULL_THRESHOLD_USD, PULL_THRESHOLD_ATOMIC } from './config'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
 /**
@@ -52,12 +53,8 @@ function handleUpstreamError(
   )
 }
 
-// Phase 2 pull config — read at startup for the worker, but also re-read per-request
-// for the gate so test overrides of process.env take effect.
-const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
-const PULL_SCALE = 10 ** USDC_DECIMALS
-const PULL_THRESHOLD_USD = Number(process.env.PULL_THRESHOLD_USD ?? 0.10)
-const PULL_THRESHOLD_ATOMIC = BigInt(Math.round(PULL_THRESHOLD_USD * PULL_SCALE))
+// Phase 2 pull config — single source of truth lives in ./config.
+// BILLING_CONTRACT_ADDRESS is still re-read per-request (below) so test env overrides take effect.
 
 export function buildApp(db: Database) {
   const app = new Elysia()
