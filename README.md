@@ -1,8 +1,8 @@
-# Payprompt
+# Latchkey
 
 **One endpoint. One wallet. Every open-weight model.**
 
-A crypto-native LLM marketplace proxy. Callers authenticate with a wallet signature instead of an API key, pre-fund a USDC balance on Base, and make standard OpenAI or Anthropic API calls. The proxy routes to the cheapest available provider, logs billing to SQLite, and will settle on-chain.
+A crypto-native LLM marketplace proxy. Callers authenticate with a wallet signature instead of an API key, pre-fund a USDC balance on Base, and make standard OpenAI or Anthropic API calls. The proxy routes to the cheapest available provider, logs billing to SQLite, and settles on-chain.
 
 Works out of the box with Claude Code, Cursor, the OpenAI SDK, and anything else that takes a base URL and an API key.
 
@@ -14,40 +14,41 @@ Works out of the box with Claude Code, Cursor, the OpenAI SDK, and anything else
 
 - EIP-712 wallet-signed bearer tokens — no accounts, no signup, no gas
 - OpenAI (`/v1/chat/completions`) and Anthropic (`/v1/messages`) endpoints
-- Format translation between both wire formats (no LiteLLM)
+- Format translation between both wire formats
 - Cheapest-provider routing from a SQLite registry
+- Provider discovery: queries `/v1/models` on startup, creates listings automatically
 - Streaming SSE passthrough with token usage extraction
 - Per-request billing logged to SQLite
+- Admin dashboard: `GET /admin/usage` (30-day aggregates by wallet/provider/model) + Next.js frontend at `payprompt-admin.vercel.app`
+- Playwright E2E test suite (12 tests, includes full billing loop verification)
 - Deployed at `https://api.latchkey.me` — Bun + Caddy on Ubuntu VPS
-- Seeded providers: DeepSeek (OpenAI format), Anthropic, OpenAI
+- Seeded providers: Anthropic (`claude-` prefix), DeepSeek (HF repo IDs + `deepseek-` prefix), OpenAI (`gpt-` prefix + o-series)
+- **Phase 1 mode:** `BALANCE_CONTRACT_ADDRESS` is empty — balance check is mocked (always passes). All valid EVM tokens get access. Intentional until phase 2 funding flow is live.
+- **Known gaps (acceptable for single-operator use, addressed in phase 2):** unauthenticated admin endpoint, no rate limiting, plaintext provider API keys in SQLite.
 
-### 🔜 Phase 2 — Smart contracts (not started)
+### 🔲 Phase 2 — On-chain balance (next)
 
-> **Research required** — see [Smart contract open questions](#smart-contract-open-questions) below.
+- Wire up `PaypromptBalance.sol` (already deployed at `0x9FDcd9DCe63e29575816c6fa9Df689a9F4566716` on Base Sepolia)
+- Pre-request balance check: `balance - pending_debits >= estimated_cost`
+- Deferred batch settlement (every 60s) with per-wallet credit limit and circuit breaker
+- Per-wallet mutex to prevent concurrent over-spend
+- Idempotency on `debit()` calls using billing_log row ID
 
-- USDC deposit contract on Base — callers fund a balance on-chain
-- Real balance check replacing the current mock in `middleware/balance.ts`
-- Protocol fee routing (1% of each settlement to treasury)
-- Provider staking — USDC stake required before listing
+### 🔲 Phase 3 — zkTLS proof (stub)
 
-### 🔜 Phase 3 — zkTLS (not started)
+- `tls_proof_queue` table + background worker exist; no prover integrated
+- Needed to prove API-delegating providers actually called the upstream
+- Blocked on production-ready prover library (TLSNotary, Reclaim, zkPass all pre-production as of mid-2026)
 
-- Async TLS proof generation for API-delegating providers (DeepSeek, Groq, etc.)
-- Proves to the chain that the upstream request happened and token counts are accurate
-- Enables trustless billing without the provider running their own infrastructure
-- **Significant research required** — see below
+### 🔲 Phase 4 — Model verification (running, no enforcement)
 
-### 🔜 Phase 4 — Model verification (not started)
+- Fingerprint probes run on startup and every 6h
+- Logs response hash drift — no slashing until phase 2 contract is live
 
-- Fingerprinting at provider onboarding (confirm model identity before listing)
-- Periodic challenge sampling post-listing (detect bait-and-switch)
-- Slashing for fraud
+### 🔲 Phase 5 — Solana rail (disabled)
 
-### 🔜 Phase 5 — Solana rail (not started)
-
-- Second funding chain alongside Base
-- Callers fund whichever chain matches their wallet
-- Proxy checks correct contract before routing; agents are chain-unaware
+- Code exists, disabled in phase 1
+- Re-enable in `middleware/auth.ts` when Solana funding flow is ready
 
 ---
 
@@ -56,8 +57,8 @@ Works out of the box with Claude Code, Cursor, the OpenAI SDK, and anything else
 **Prerequisites:** [Bun](https://bun.sh) (`curl -fsSL https://bun.sh/install | bash`)
 
 ```bash
-git clone https://github.com/marvinmarnold/payprompt.git
-cd payprompt
+git clone https://github.com/marvinmarnold/latchkey.git
+cd latchkey
 bun install
 
 cp packages/proxy/.env.example packages/proxy/.env
@@ -66,12 +67,10 @@ cp packages/proxy/.env.example packages/proxy/.env
 
 cd packages/proxy
 bun run dev
-# → Payprompt proxy running on http://localhost:3000
+# → Latchkey proxy running on http://localhost:3000
 ```
 
 ### Generate a bearer token
-
-The proxy uses wallet-signed tokens instead of API keys. Generate one from any EVM private key:
 
 ```bash
 cd packages/proxy
@@ -82,40 +81,38 @@ console.log(token)
 "
 ```
 
-Use any throwaway private key for local testing. Keep this token — it's your API key for all requests.
-
 ### Test it
 
 ```bash
-# Health check (no auth needed)
 curl http://localhost:3000/health
 
-# OpenAI format
-curl -s http://localhost:3000/v1/chat/completions \
-  -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer <YOUR_TOKEN>' \
-  -d '{"model":"deepseek-ai/DeepSeek-V3","messages":[{"role":"user","content":"Say hi."}]}'
-
-# Anthropic format
 curl -s http://localhost:3000/v1/messages \
   -H 'Content-Type: application/json' \
   -H 'x-api-key: <YOUR_TOKEN>' \
-  -d '{"model":"deepseek-ai/DeepSeek-V3","messages":[{"role":"user","content":"Say hi."}],"max_tokens":50}'
+  -d '{"model":"claude-haiku-4-5-20251001","messages":[{"role":"user","content":"Say hi."}],"max_tokens":20}'
 ```
 
 ### Use with Claude Code
 
 ```bash
-export ANTHROPIC_BASE_URL=https://api.latchkey.me  # or http://localhost:3000 locally
-export ANTHROPIC_API_KEY=<YOUR_TOKEN>
-claude  # routes through the proxy
+source .env.client   # sets ANTHROPIC_BASE_URL + ANTHROPIC_API_KEY
+claude
 ```
 
 ### Run tests
 
 ```bash
-cd packages/proxy
-bun test
+cd packages/proxy && bun test
+
+# E2E (local — spins up proxy + admin automatically):
+cd packages/e2e && npx playwright test
+
+# E2E (production):
+cd packages/e2e
+E2E_PROXY_URL=https://api.latchkey.me \
+E2E_ADMIN_URL=https://payprompt-admin.vercel.app \
+E2E_BEARER_TOKEN=<token> \
+npx playwright test
 ```
 
 ---
@@ -124,110 +121,54 @@ bun test
 
 ```
 Caller (agent or developer)
-  │  Authorization: Bearer <EIP-712 signed token>
+  │  Authorization: Bearer <EIP-712 signed token>  or  x-api-key: <token>
   ▼
 Proxy
-  ├─ Verify token signature (viem, EIP-712)
-  ├─ Check USDC balance  ← mocked in Phase 1, always passes
-  ├─ Normalise format    ← Anthropic → OpenAI if needed
-  ├─ Select provider     ← SQLite: cheapest active listing for model
-  ├─ Forward request     ← streaming SSE passthrough
-  ├─ Translate response  ← OpenAI → Anthropic if needed
-  └─ Log billing         ← extract token usage, write to SQLite
+  ├─ Verify token signature (viem EIP-712)
+  ├─ Check balance           ← mocked phase 1; real contract phase 2
+  ├─ Normalise format        ← Anthropic → OpenAI if needed
+  ├─ Select listing          ← cheapest active listing for model (SQLite)
+  ├─ Forward request         ← streaming SSE passthrough
+  ├─ Translate response      ← OpenAI → Anthropic if needed
+  └─ Log billing             ← extract token usage, write to SQLite
 ```
 
 ---
 
 ## Bearer token format
 
-Callers sign a structured EIP-712 message with their wallet private key — no gas, no on-chain transaction, no registration:
-
 ```ts
 type BearerToken = {
-  address: string  // EVM wallet address
-  expiry:  number  // Unix timestamp — limits blast radius of a leaked token
-  nonce:   string  // Random — prevents replay
-  sig:     string  // EIP-712 signature over {address, expiry, nonce}
+  address: string  // EVM wallet address (0x...)
+  expiry:  number  // Unix timestamp
+  nonce:   string  // random hex
+  sig:     string  // EIP-712 signature
 }
-// Serialised as base64(JSON.stringify(token))
-// Passed as: Authorization: Bearer <token>  (OpenAI)
-//        or: x-api-key: <token>              (Anthropic)
+// base64(JSON.stringify(token))
+// Passed as: Authorization: Bearer <token>  (OpenAI format)
+//        or: x-api-key: <token>             (Anthropic format)
 ```
-
----
-
-## Provider registry
-
-Providers are rows in SQLite. On startup, `seedProviders()` in `db.ts` inserts defaults based on env vars. The router selects the cheapest active listing for the requested model.
-
-Two matching strategies per listing:
-- **Exact** (`model_id`) — matches a specific HF repo ID like `deepseek-ai/DeepSeek-V3`
-- **Prefix** (`model_prefix`) — matches anything starting with e.g. `claude-` or `gpt-`
-
-Two provider types:
-- **Self-hosted** — vLLM, Ollama, llama.cpp with an OpenAI-compatible endpoint
-- **API-delegating** — holds a key for DeepSeek, Groq, Together, etc.
-
----
-
-## Smart contract open questions
-
-Phase 2 requires on-chain USDC balance tracking on Base. The architecture is sketched but **no contract code exists yet** and several design questions need answers before implementation:
-
-**Balance contract**
-- Does each caller get their own balance slot in a single shared contract, or a separate contract per caller?
-- What's the withdrawal mechanism — immediate, or tiered with a delay to handle disputes?
-- How does the proxy debit the balance? It currently runs off-chain with SQLite — do we do batched settlement or per-request?
-
-**Protocol fee**
-- 1% is the target. Does it route at settlement time via the contract, or does the proxy take a cut before forwarding to providers?
-
-**Provider staking**
-- What's the minimum stake amount? Needs modelling against realistic slash amounts.
-- Is stake per-listing or per-provider?
-- What's the unbonding period?
-
-**zkTLS (Phase 3 — more research needed)**
-- No production-ready zkTLS library exists for this use case as of early 2026.
-- Closest projects: [TLSNotary](https://tlsnotary.org), [Reclaim Protocol](https://reclaimprotocol.org), [zkPass](https://zkpass.org).
-- The proof has to cover: server identity (api.deepseek.com), response body (`usage.prompt_tokens`, `usage.completion_tokens`), without revealing the provider's API key.
-- Proof generation is the bottleneck — current estimates are seconds to minutes per proof. Async settlement is mandatory.
-- **This needs a research spike before Phase 3 can be planned.**
 
 ---
 
 ## Project layout
 
 ```
-packages/proxy/
-  src/
-    index.ts              Elysia app + entry point
-    db.ts                 SQLite schema, provider seed
-    router.ts             cheapest-provider selection
-    forwarder.ts          HTTP forwarding + SSE passthrough
-    billing.ts            usage extraction, cost logging
-    middleware/
-      auth.ts             EIP-712 token verify (viem)
-      balance.ts          USDC balance check (mocked)
-    format/
-      normalise.ts        Anthropic → OpenAI request
-      translate.ts        OpenAI → Anthropic response
-  test/                   bun test suite
-deploy/
-  deploy.sh               one-command deploy from local machine
-  payprompt-proxy.service systemd unit
-  Caddyfile               Caddy reverse proxy + HTTPS
-  caddy.service           Caddy systemd unit
-CONTEXT.md                domain glossary and architecture decisions
+packages/proxy/        Bun/Elysia proxy server
+packages/admin/        Next.js admin dashboard (Vercel)
+packages/e2e/          Playwright E2E tests
+packages/contracts/    Solidity smart contracts (Foundry)
+deploy/                Server deploy + sync scripts
 ```
 
 ## Stack
 
 | | |
 |---|---|
-| **Runtime** | [Bun](https://bun.sh) — TypeScript natively, built-in SQLite |
-| **HTTP** | [Elysia](https://elysiajs.com) — Bun-native framework |
-| **Auth** | [viem](https://viem.sh) — EIP-712 signing and recovery |
-| **Storage** | SQLite (`bun:sqlite`) — provider registry and billing log |
-| **Chain** | Base (EVM) — Phase 2 onwards |
-| **Reverse proxy** | Caddy — automatic HTTPS via Cloudflare DNS challenge |
+| **Runtime** | Bun — TypeScript natively, built-in SQLite |
+| **HTTP** | Elysia — Bun-native framework |
+| **Auth** | viem — EIP-712 signing and recovery |
+| **Storage** | SQLite (`bun:sqlite`) |
+| **Chain** | Base (EVM) — phase 2 onwards |
+| **Admin** | Next.js 15 + Recharts on Vercel |
+| **Reverse proxy** | Caddy — automatic HTTPS via Cloudflare DNS |

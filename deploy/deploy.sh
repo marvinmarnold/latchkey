@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy payprompt proxy to a fresh Ubuntu VPS via SSH password auth.
+# Deploy latchkey proxy to a fresh Ubuntu VPS via SSH password auth.
 # Usage: bun run deploy  (reads packages/proxy/.env automatically)
 set -euo pipefail
 
@@ -14,7 +14,7 @@ fi
 
 HOST="${DEPLOY_HOST:?DEPLOY_HOST env var required}"
 DEPLOY_USER="${DEPLOY_USER:?DEPLOY_USER env var required}"
-APP_DIR="/root/payprompt"
+APP_DIR="/root/latchkey"
 
 PASS="${DEPLOY_PASSWORD:?DEPLOY_PASSWORD env var required}"
 
@@ -53,31 +53,43 @@ fi
 mkdir -p /etc/caddy
 
 echo "--- clone or pull repo"
-if [ -d /root/payprompt/.git ]; then
-  git -C /root/payprompt pull
+if [ -d /root/latchkey/.git ]; then
+  git -C /root/latchkey fetch --all
 else
-  git clone https://github.com/marvinmarnold/payprompt.git /root/payprompt
+  # Migrate from old payprompt directory if it exists
+  if [ -d /root/payprompt/.git ]; then
+    mv /root/payprompt /root/latchkey
+    git -C /root/latchkey remote set-url origin https://github.com/marvinmarnold/latchkey.git
+    git -C /root/latchkey fetch --all
+  else
+    git clone https://github.com/marvinmarnold/latchkey.git /root/latchkey
+    git -C /root/latchkey fetch --all
+  fi
 fi
 
-echo "--- install dependencies"
-cd /root/payprompt
-"$HOME/.bun/bin/bun" install --frozen-lockfile
-
 echo "--- install systemd services"
-cp /root/payprompt/deploy/payprompt-proxy.service /etc/systemd/system/
-cp /root/payprompt/deploy/caddy.service /etc/systemd/system/
+cp /root/latchkey/deploy/latchkey-proxy.service /etc/systemd/system/
+cp /root/latchkey/deploy/caddy.service /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable payprompt-proxy caddy
+systemctl enable latchkey-proxy caddy
 SETUP
+
+BRANCH="${DEPLOY_BRANCH:-main}"
+echo "==> Checking out branch: $BRANCH"
+$SSH "git -C $APP_DIR checkout $BRANCH && git -C $APP_DIR pull origin $BRANCH && cd $APP_DIR && /root/.bun/bin/bun install --frozen-lockfile"
 
 echo "==> Writing .env"
 $SSH "cat > $APP_DIR/packages/proxy/.env" << ENV
 PORT=3000
-DB_PATH=$APP_DIR/packages/proxy/payprompt.db
+DB_PATH=$APP_DIR/packages/proxy/latchkey.db
 NODE_ENV=production
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 OPENAI_API_KEY=${OPENAI_API_KEY:-}
+BASE_RPC_URL=${BASE_RPC_URL:-https://sepolia.base.org}
+BALANCE_CONTRACT_ADDRESS=${BALANCE_CONTRACT_ADDRESS:-}
+SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+SOLANA_USDC_MINT=${SOLANA_USDC_MINT:-4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU}
 ENV
 
 echo "==> Writing Caddy config and Cloudflare token"
@@ -108,7 +120,7 @@ else
 fi
 
 echo "==> Starting services"
-$SSH "systemctl restart payprompt-proxy caddy"
+$SSH "systemctl restart latchkey-proxy caddy"
 
 echo ""
 echo "✅ Deployed."

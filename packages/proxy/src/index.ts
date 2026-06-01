@@ -9,19 +9,26 @@ import { selectListing, penaliseListing } from './router'
 import { forwardToProvider } from './forwarder'
 import { discoverModels } from './discovery'
 import { extractUsageFromStream, computeCost, logUsage } from './billing'
+import { enqueueProofJob, startProofWorker } from './zktls'
+import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
+import { queryUsage } from './admin'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
 export function buildApp(db: Database) {
   const app = new Elysia()
     .get('/health', () => ({ status: 'ok', version: '0.1.0' }))
+    .get('/admin/usage', ({ set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryUsage(db)
+    })
 
   const api = new Elysia()
     .resolve(async ({ request }) => {
       const encoded = extractTokenFromRequest(request)
       if (!encoded) return status(401, { error: { type: 'authentication_error', message: 'Missing token' } })
       try {
-        const callerAddress = await verifyBearerToken(encoded)
-        await assertSufficientBalance(callerAddress)
+        const { callerAddress, chain } = await verifyBearerToken(encoded)
+        await assertSufficientBalance(callerAddress, chain)
         return { callerAddress }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Invalid token'
@@ -37,9 +44,11 @@ export function buildApp(db: Database) {
       try {
         const { stream, json, isStreaming } = await forwardToProvider(listing, req, req.model)
         if (isStreaming && stream) {
-          const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+          const providerHost = new URL(listing.endpoint).hostname
+        const { stream: billedStream } = extractUsageFromStream(stream, usage => {
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           set.headers['Content-Type'] = 'text/event-stream'
           set.headers['Cache-Control'] = 'no-cache'
@@ -48,7 +57,8 @@ export function buildApp(db: Database) {
         }
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
         penaliseListing(db, listing.id)
@@ -63,10 +73,12 @@ export function buildApp(db: Database) {
       if (!listing) return status(404, { error: { type: 'not_found_error', message: `No provider for model: ${req.model}` } })
       try {
         const { stream, json, isStreaming } = await forwardToProvider(listing, openAIReq, req.model)
+        const msgProviderHost = new URL(listing.endpoint).hostname
         if (isStreaming && stream) {
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           const anthropicStream = openAIStreamToAnthropicStream(billedStream)
           set.headers['Content-Type'] = 'text/event-stream'
@@ -76,7 +88,8 @@ export function buildApp(db: Database) {
         }
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
         penaliseListing(db, listing.id)
@@ -93,10 +106,18 @@ if (import.meta.main) {
   seedProviders(db)
   const PORT = Number(process.env.PORT ?? 3000)
   const server = buildApp(db).listen(PORT)
-  console.log(`Payprompt proxy running on http://localhost:${PORT}`)
+  console.log(`Latchkey proxy running on http://localhost:${PORT}`)
   // Discover models in the background — don't block accepting traffic
   discoverModels(db).then(
     () => console.log('[discovery] complete'),
     (e) => console.warn('[discovery]', (e as Error).message),
   )
+  // Phase 3: zkTLS proof worker (stub — no prover connected yet)
+  startProofWorker(db)
+  // Phase 4: model fingerprinting — baseline on startup, re-check every 6 hours
+  fingerprintAllListings(db).then(
+    () => console.log('[fingerprint] baseline complete'),
+    (e) => console.warn('[fingerprint]', (e as Error).message),
+  )
+  startFingerprintWorker(db)
 }

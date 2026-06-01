@@ -1,54 +1,79 @@
-# Payprompt Copilot — LLM Proxy/Marketplace Research
+# Latchkey — Agentic Context
 
-## Project Overview
+## What this project is
 
-Building a crypto-native LLM proxy: **one endpoint, one wallet, every model. No API keys.**
+A crypto-native LLM proxy. One endpoint, one wallet, every model. Callers sign with an EVM private key, pre-fund USDC on Base, and make standard OpenAI/Anthropic API calls. The proxy routes to the cheapest provider and logs billing on-chain.
 
-- OpenAI-compatible `/v1/chat/completions` endpoint
-- Wallet auth via EIP-712 session keys
-- LiteLLM under the hood (100+ providers)
-- On-chain billing via x402 protocol + USDC
-- EVM-first, Solana as second rail
+## Live endpoints
 
-## API Configuration
+- **Proxy:** `https://api.latchkey.me` (Bun/Elysia on Servury VPS, `root@151.247.22.152`)
+- **Admin:** `https://payprompt-admin.vercel.app` (Next.js on Vercel, project `payprompt-admin`)
+- **GitHub:** `git@github.com:marvinmarnold/latchkey.git` — active branch `ma/3`
+
+## How to use the proxy as Claude Code
 
 ```bash
-export PAYPROMPT_COPILOT_API_BASE="https://copilot.payprompt.com/api/v1"
-export PAYPROMPT_COPILOT_PAT="<set in environment>"  # expires 2026-08-20
+source .env.client   # sets ANTHROPIC_BASE_URL=https://api.latchkey.me and ANTHROPIC_API_KEY=<token>
+claude
 ```
 
-Key endpoints:
-- `GET /status` — auth check
-- `GET /filters` — available hackathons, categories
-- `GET /projects/search?q=...` — search the corpus
-- `GET /archives/:id` — fetch full research documents
-- `POST /research/deep-dive` — 8-step deep dive analysis
+Token in `.env.client` expires 2026-06-30. Regenerate:
+```bash
+cd packages/proxy
+~/.bun/bin/bun -e "import{encodeBearerToken}from'./src/middleware/auth.ts'; process.stdout.write(await encodeBearerToken('$(grep TEST_PRIVATE_KEY packages/proxy/.env | cut -d= -f2)', Math.floor(Date.now()/1000)+30*86400))"
+```
 
-## Research Context (from prior session)
+## Phase status
 
-### Prior art already identified:
+| Phase | Status | Gating condition |
+|-------|--------|-----------------|
+| 1 — Proxy | ✅ live | — |
+| 2 — On-chain balance | 🔲 next | Contract deployed, proxy not wired |
+| 3 — zkTLS | 🔲 stub | No prover library available |
+| 4 — Fingerprinting | ✅ running | No enforcement until phase 2 |
+| 5 — Solana | 🔲 disabled | Re-enable in `middleware/auth.ts` |
 
-| Project | Hackathon | Relevance |
-|---------|-----------|-----------|
-| solrouter | Cypherpunk | Multi-model, USDC, wallet auth; Solana-only, UI studio not proxy |
-| latinum-agentic-commerce | Breakout (1st place AI, $25k) | Agent payment middleware, API key sprawl pain; general purpose, no LLM routing |
-| agent-cred | Cypherpunk | Hotkey/coldkey spending limits, agent payment infra; pure infra, no LLM layer |
-| solaibot | Cypherpunk | Agent autonomous payments; general toolkit, not proxy |
-| solana-a2a-payment | Cypherpunk | x402 + Solana Pay adaptation |
+## Deploy workflow
 
-### Open threads:
-- Galaxy Research x402 doc (archive ID: 21fe158b-da81-40d7-89c0-a726e79191e2) — not yet pulled
-- "Frontier" hackathon entries — not yet indexed
-- "autohodl" project — not found, needs more search context
-- Full 8-step deep dive — not triggered yet
+```bash
+# 1. Code change → push
+git push origin ma/3
 
-### Available hackathons in corpus:
-Renaissance (Mar 2024), Radar (Sep 2024), Breakout (Apr 2025), Cypherpunk (Sep 2025)
+# 2. Pull on server + restart
+ssh -i ~/.ssh/id_ed25519 root@151.247.22.152 \
+  "cd /root/latchkey && git pull origin ma/3 && /root/.bun/bin/bun install --frozen-lockfile && systemctl restart latchkey-proxy"
 
-## Project Conventions
+# 3. ALWAYS sync env after a deploy (prevents stale BALANCE_CONTRACT_ADDRESS)
+bash deploy/sync-env.sh
 
-- Use `payprompt-copilot` skill for all API interactions
-- Before any creative/design work, invoke brainstorming skill
-- Before committing to architecture decisions, invoke grill-me skill
-- Save research findings to `research/` directory with dated filenames
-- Use subagent scout for broad searches, evaluator for comparing ideas to prior art
+# 4. Verify with E2E billing loop test
+cd packages/e2e
+E2E_PROXY_URL=https://api.latchkey.me \
+E2E_ADMIN_URL=https://payprompt-admin.vercel.app \
+E2E_BEARER_TOKEN=<fresh token> \
+npx playwright test
+```
+
+## Critical invariant: BALANCE_CONTRACT_ADDRESS must be empty in phase 1
+
+If it has a value, all requests return 402. `deploy/sync-env.sh` reads from local `.env` which has it empty. Never set it on the server until the funding flow is tested end-to-end.
+
+## Wallet / credentials
+
+- **Private key:** in `packages/proxy/.env` as `TEST_PRIVATE_KEY`
+- **EVM address:** `0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89`
+- **Client env file:** `.env.client` (gitignored)
+- **Server SSH:** `ssh -i ~/.ssh/id_ed25519 root@151.247.22.152` (passwordless)
+
+## Running E2E tests
+
+```bash
+# Local (12 tests, full billing loop, no credentials needed):
+cd packages/e2e && npx playwright test
+
+# Production (9 pass, 3 skip):
+E2E_PROXY_URL=https://api.latchkey.me \
+E2E_ADMIN_URL=https://payprompt-admin.vercel.app \
+E2E_BEARER_TOKEN=<token> \
+npx playwright test
+```

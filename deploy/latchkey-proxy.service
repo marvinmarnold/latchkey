@@ -1,0 +1,16 @@
+[Unit]
+Description=Latchkey Proxy
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/latchkey
+ExecStart=/root/.bun/bin/bun run packages/proxy/src/index.ts
+EnvironmentFile=/root/latchkey/packages/proxy/.env
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

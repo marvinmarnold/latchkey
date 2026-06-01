@@ -7,7 +7,7 @@ services:
       - proxy-data:/app/data
     environment:
       PORT: 3000
-      DB_PATH: /app/data/payprompt.db
+      DB_PATH: /app/data/latchkey.db
       NODE_ENV: production
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
