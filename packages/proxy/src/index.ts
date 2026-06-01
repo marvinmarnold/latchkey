@@ -46,8 +46,8 @@ export function buildApp(db: Database) {
         if (isStreaming && stream) {
           const providerHost = new URL(listing.endpoint).hostname
         const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           set.headers['Content-Type'] = 'text/event-stream'
@@ -56,8 +56,8 @@ export function buildApp(db: Database) {
           return new Response(billedStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+        const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
         try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
@@ -76,8 +76,8 @@ export function buildApp(db: Database) {
         const msgProviderHost = new URL(listing.endpoint).hostname
         if (isStreaming && stream) {
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           const anthropicStream = openAIStreamToAnthropicStream(billedStream)
@@ -87,8 +87,8 @@ export function buildApp(db: Database) {
           return new Response(anthropicStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+        const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
         try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {

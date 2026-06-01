@@ -10,20 +10,20 @@ beforeEach(() => {
   db = openDb(':memory:')
   db.run(`INSERT INTO providers (id, name) VALUES ('p1', 'TestProvider')`)
   db.run(`
-    INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output)
+    INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million)
     VALUES ('l1', 'p1', 'test-model', 'openai', 'https://example.com', 100, 200)
   `)
   const now = Math.floor(Date.now() / 1000)
   db.run(
-    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
      VALUES ('b1', '0xabc', 'l1', 'test-model', 100, 50, 10, ?)`, [now],
   )
   db.run(
-    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
      VALUES ('b2', '0xabc', 'l1', 'test-model', 200, 100, 20, ?)`, [now],
   )
   db.run(
-    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
      VALUES ('b3', '0xdef', 'l1', 'test-model', 50, 25, 5, ?)`, [now],
   )
 })
@@ -59,7 +59,7 @@ describe('queryUsage', () => {
   it('excludes rows older than 30 days', () => {
     const old = Math.floor(Date.now() / 1000) - 31 * 86400
     db.run(
-      `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+      `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
        VALUES ('b_old', '0xold', 'l1', 'test-model', 999, 999, 99, ?)`, [old],
     )
     const { byWallet } = queryUsage(db)
@@ -76,12 +76,12 @@ describe('GET /admin/usage', () => {
     const testDb = openDb(':memory:')
     testDb.run(`INSERT INTO providers (id, name) VALUES ('p1', 'TestProvider')`)
     testDb.run(`
-      INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output)
+      INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million)
       VALUES ('l1', 'p1', 'test-model', 'openai', 'https://example.com', 100, 200)
     `)
     const now = Math.floor(Date.now() / 1000)
     testDb.run(
-      `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+      `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
        VALUES ('b1', '0xabc', 'l1', 'test-model', 100, 50, 10, ?)`, [now],
     )
     server = buildApp(testDb).listen(ADMIN_PORT)

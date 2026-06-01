@@ -2,19 +2,24 @@ import type { Database } from 'bun:sqlite'
 import type { UsageRecord } from './types'
 import { randomUUID } from 'crypto'
 
+/**
+ * Cost of a request in **dollars** (the canonical internal unit).
+ * Prices are dollars per million tokens. Conversion to a token's atomic units
+ * (e.g. USDC's 6 decimals) happens only at settlement time — see puller.ts.
+ */
 export function computeCost(
   inputTokens: number,
   outputTokens: number,
-  priceInput: number,
-  priceOutput: number,
+  priceInputUsdPerMillion: number,
+  priceOutputUsdPerMillion: number,
 ): number {
-  return Math.ceil((inputTokens * priceInput + outputTokens * priceOutput) / 1_000_000)
+  return (inputTokens * priceInputUsdPerMillion + outputTokens * priceOutputUsdPerMillion) / 1_000_000
 }
 
-export function logUsage(db: Database, record: UsageRecord): { id: string; costUsdc: number } {
+export function logUsage(db: Database, record: UsageRecord): { id: string; costUsd: number } {
   const id = randomUUID()
   db.run(
-    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usdc, created_at)
+    `INSERT INTO billing_log (id, caller_address, listing_id, model_id, input_tokens, output_tokens, cost_usd, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
@@ -23,11 +28,11 @@ export function logUsage(db: Database, record: UsageRecord): { id: string; costU
       record.modelId,
       record.inputTokens,
       record.outputTokens,
-      record.costUsdc,
+      record.costUsd,
       Math.floor(Date.now() / 1000),
     ],
   )
-  return { id, costUsdc: record.costUsdc }
+  return { id, costUsd: record.costUsd }
 }
 
 type OAIUsage = { prompt_tokens: number; completion_tokens: number; total_tokens: number }

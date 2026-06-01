@@ -52,7 +52,7 @@ beforeAll(async () => {
   db = openDb(':memory:')
   db.run(`INSERT INTO providers (id, name) VALUES ('mock-p1', 'MockProvider')`)
   db.run(`
-    INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output)
+    INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million)
     VALUES ('mock-l1', 'mock-p1', 'test/TestModel', 'openai', 'http://localhost:${MOCK_PORT}/v1', 270, 1100)
   `)
 

@@ -28,8 +28,8 @@ export type Listing = {
   endpoint: string               // base URL, e.g. "https://api.deepseek.com/v1"
   api_key: string | null
   provider_model_id: string | null  // model name sent upstream; null = pass caller's model through
-  price_input: number            // USDC micro-units per 1M input tokens
-  price_output: number           // USDC micro-units per 1M output tokens
+  price_input_usd_per_million: number    // dollars per 1M input tokens
+  price_output_usd_per_million: number   // dollars per 1M output tokens
   ctx_length: number | null
   reliability: number            // 0–1
   active: number                 // 1 = active, 0 = inactive
@@ -112,5 +112,5 @@ export type UsageRecord = {
   modelId: string
   inputTokens: number
   outputTokens: number
-  costUsdc: number  // micro-units (1 USDC = 1_000_000)
+  costUsd: number  // dollars (canonical internal unit)
 }
