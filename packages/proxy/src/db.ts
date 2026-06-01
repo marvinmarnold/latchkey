@@ -15,6 +15,26 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
     db.run('DROP TABLE IF EXISTS providers')
   }
 
+  // Phase 2 migration: prices/costs are now dollars (REAL), not USDC micro-units (INTEGER).
+  // listings is fully regenerable (re-seeded + re-discovered on startup) → drop & recreate.
+  // billing_log carries token history the dashboard charts → preserve via column rename.
+  const listingsHasOldPrice = db
+    .query<{ count: number }, []>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('listings') WHERE name = 'price_input'`,
+    )
+    .get()
+  if (listingsHasOldPrice && listingsHasOldPrice.count > 0) {
+    db.run('DROP TABLE IF EXISTS listings')
+  }
+  const billingHasOldCost = db
+    .query<{ count: number }, []>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('billing_log') WHERE name = 'cost_usdc'`,
+    )
+    .get()
+  if (billingHasOldCost && billingHasOldCost.count > 0) {
+    db.run('ALTER TABLE billing_log RENAME COLUMN cost_usdc TO cost_usd')
+  }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS providers (
       id     TEXT PRIMARY KEY,
@@ -33,8 +53,8 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
       endpoint          TEXT NOT NULL,
       api_key           TEXT,
       provider_model_id TEXT,
-      price_input       INTEGER NOT NULL,
-      price_output      INTEGER NOT NULL,
+      price_input_usd_per_million   REAL NOT NULL,
+      price_output_usd_per_million  REAL NOT NULL,
       ctx_length        INTEGER,
       reliability       REAL NOT NULL DEFAULT 1.0,
       active            INTEGER NOT NULL DEFAULT 1,
@@ -50,7 +70,7 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
       model_id       TEXT NOT NULL,
       input_tokens   INTEGER NOT NULL,
       output_tokens  INTEGER NOT NULL,
-      cost_usdc      INTEGER NOT NULL,
+      cost_usd       REAL NOT NULL,
       created_at     INTEGER NOT NULL
     )
   `)
@@ -82,6 +102,34 @@ export function openDb(path: string = process.env.DB_PATH ?? './latchkey.db'): D
     )
   `)
 
+  // Phase 2: per-wallet pull-payment accounting.
+  // accrued_usd = off-chain debt not yet pulled; pending_* = a pull in flight
+  // (snapshot + deterministic tx hash + raw signed tx, for crash-safe re-broadcast).
+  db.run(`
+    CREATE TABLE IF NOT EXISTS wallet_state (
+      address             TEXT PRIMARY KEY,
+      accrued_usd         REAL    NOT NULL DEFAULT 0.0,
+      total_pulled_usd    REAL    NOT NULL DEFAULT 0.0,
+      pull_failure_count  INTEGER NOT NULL DEFAULT 0,
+      pending_pull_usd    REAL,
+      pending_pull_tx     TEXT,
+      pending_pull_raw    TEXT,
+      last_pull_at        INTEGER,
+      last_pull_tx        TEXT,
+      blocked             INTEGER NOT NULL DEFAULT 0
+    )
+  `)
+
+  // Migration: add last_pull_tx if it doesn't exist yet
+  const hasLastPullTx = db
+    .query<{ count: number }, []>(
+      `SELECT COUNT(*) as count FROM pragma_table_info('wallet_state') WHERE name = 'last_pull_tx'`,
+    )
+    .get()
+  if (hasLastPullTx && hasLastPullTx.count === 0) {
+    db.run(`ALTER TABLE wallet_state ADD COLUMN last_pull_tx TEXT`)
+  }
+
   return db
 }
 
@@ -95,9 +143,11 @@ export function seedProviders(db: Database): void {
 
   db.run(
     `INSERT INTO listings
-       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
+       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key,
+       price_input_usd_per_million = excluded.price_input_usd_per_million,
+       price_output_usd_per_million = excluded.price_output_usd_per_million`,
     [
       'twoshoes-anthropic',
       'twoshoes',
@@ -105,8 +155,8 @@ export function seedProviders(db: Database): void {
       'anthropic',
       'https://api.anthropic.com',
       process.env.ANTHROPIC_API_KEY ?? null,
-      3000,    // ~$3/M input (rough Claude Sonnet tier)
-      15000,   // ~$15/M output
+      3.00,    // $3/M input (rough Claude Sonnet tier)
+      15.00,   // $15/M output
     ],
   )
 
@@ -120,20 +170,24 @@ export function seedProviders(db: Database): void {
   for (const [modelId, providerModelId, id] of deepseekAliases) {
     db.run(
       `INSERT INTO listings
-         (id, provider_id, model_id, provider_model_id, upstream_format, endpoint, api_key, price_input, price_output)
+         (id, provider_id, model_id, provider_model_id, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
-      [id, 'twoshoes', modelId, providerModelId, 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
+       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key,
+         price_input_usd_per_million = excluded.price_input_usd_per_million,
+         price_output_usd_per_million = excluded.price_output_usd_per_million`,
+      [id, 'twoshoes', modelId, providerModelId, 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 0.27, 1.10],
     )
   }
 
   // Prefix catch-all for deepseek- native API names (e.g. deepseek-v4-pro sent directly)
   db.run(
     `INSERT INTO listings
-       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
+       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
-    ['twoshoes-deepseek', 'twoshoes', 'deepseek-', 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 270, 1100],
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key,
+       price_input_usd_per_million = excluded.price_input_usd_per_million,
+       price_output_usd_per_million = excluded.price_output_usd_per_million`,
+    ['twoshoes-deepseek', 'twoshoes', 'deepseek-', 'openai', 'https://api.deepseek.com/v1', process.env.DEEPSEEK_API_KEY ?? null, 0.27, 1.10],
   )
 
   // Provider: BigThought — OpenAI only
@@ -141,9 +195,11 @@ export function seedProviders(db: Database): void {
 
   db.run(
     `INSERT INTO listings
-       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input, price_output)
+       (id, provider_id, model_prefix, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
+     ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key,
+       price_input_usd_per_million = excluded.price_input_usd_per_million,
+       price_output_usd_per_million = excluded.price_output_usd_per_million`,
     [
       'bigthought-gpt',
       'bigthought',
@@ -151,8 +207,8 @@ export function seedProviders(db: Database): void {
       'openai',
       'https://api.openai.com/v1',
       process.env.OPENAI_API_KEY ?? null,
-      2500,   // ~$2.50/M input (gpt-4o tier)
-      10000,  // ~$10/M output
+      2.50,   // $2.50/M input (gpt-4o tier)
+      10.00,  // $10/M output
     ],
   )
 
@@ -160,9 +216,11 @@ export function seedProviders(db: Database): void {
   for (const model of oModels) {
     db.run(
       `INSERT INTO listings
-         (id, provider_id, model_id, upstream_format, endpoint, api_key, price_input, price_output)
+         (id, provider_id, model_id, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key`,
+       ON CONFLICT(id) DO UPDATE SET api_key = excluded.api_key,
+         price_input_usd_per_million = excluded.price_input_usd_per_million,
+         price_output_usd_per_million = excluded.price_output_usd_per_million`,
       [
         `bigthought-${model}`,
         'bigthought',
@@ -170,8 +228,8 @@ export function seedProviders(db: Database): void {
         'openai',
         'https://api.openai.com/v1',
         process.env.OPENAI_API_KEY ?? null,
-        2500,
-        10000,
+        2.50,
+        10.00,
       ],
     )
   }

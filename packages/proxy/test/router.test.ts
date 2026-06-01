@@ -10,7 +10,7 @@ beforeEach(() => {
   // Seed two providers
   db.run(`INSERT INTO providers (id, name) VALUES ('pa', 'ProviderA'), ('pb', 'ProviderB')`)
   db.run(`
-    INSERT INTO listings (id, provider_id, model_id, model_prefix, upstream_format, endpoint, price_input, price_output, active)
+    INSERT INTO listings (id, provider_id, model_id, model_prefix, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million, active)
     VALUES
       ('l1', 'pa', NULL, 'deepseek-', 'openai', 'https://expensive.example.com/v1', 500,  2000, 1),
       ('l2', 'pb', NULL, 'deepseek-', 'openai', 'https://cheap.example.com/v1',     200,  800,  1),

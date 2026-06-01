@@ -20,8 +20,8 @@ try {
   )
   db.run(
     `INSERT OR REPLACE INTO listings
-       (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output, active)
-     VALUES ('e2e-listing', 'e2e-provider', 'e2e-test-model', 'openai', ?, 100, 200, 1)`,
+       (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million, active)
+     VALUES ('e2e-listing', 'e2e-provider', 'e2e-test-model', 'openai', ?, 0.10, 0.20, 1)`,
     [`http://localhost:${portNum}/v1`],
   )
   console.log(`[seed] test listing injected → http://localhost:${portNum}/v1`)

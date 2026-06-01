@@ -5,8 +5,8 @@ type EndpointConfig = {
   endpoint: string
   upstream_format: 'openai' | 'anthropic'
   api_key: string | null
-  price_input: number
-  price_output: number
+  price_input_usd_per_million: number
+  price_output_usd_per_million: number
 }
 
 export async function discoverModels(db: Database): Promise<void> {
@@ -14,8 +14,8 @@ export async function discoverModels(db: Database): Promise<void> {
   const endpoints = db
     .query<EndpointConfig, []>(`
       SELECT provider_id, endpoint, upstream_format, api_key,
-             CAST(AVG(price_input) AS INTEGER) AS price_input,
-             CAST(AVG(price_output) AS INTEGER) AS price_output
+             COALESCE(AVG(price_input_usd_per_million), 0) AS price_input_usd_per_million,
+             COALESCE(AVG(price_output_usd_per_million), 0) AS price_output_usd_per_million
       FROM listings
       WHERE active = 1
       GROUP BY provider_id, endpoint, upstream_format, api_key
@@ -35,7 +35,7 @@ async function discoverEndpoint(db: Database, ep: EndpointConfig): Promise<void>
     const modelIds = await fetchModelIds(ep as EndpointConfig & { api_key: string })
     const stmt = db.prepare(`
       INSERT OR IGNORE INTO listings
-        (id, provider_id, model_id, upstream_format, endpoint, api_key, price_input, price_output)
+        (id, provider_id, model_id, upstream_format, endpoint, api_key, price_input_usd_per_million, price_output_usd_per_million)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `)
     for (const modelId of modelIds) {
@@ -46,8 +46,8 @@ async function discoverEndpoint(db: Database, ep: EndpointConfig): Promise<void>
         ep.upstream_format,
         ep.endpoint,
         ep.api_key,
-        ep.price_input,
-        ep.price_output,
+        ep.price_input_usd_per_million,
+        ep.price_output_usd_per_million,
       )
     }
     console.log(`[discovery] ${ep.endpoint}: ${modelIds.length} models`)

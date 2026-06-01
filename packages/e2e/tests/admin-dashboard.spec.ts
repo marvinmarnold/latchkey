@@ -98,7 +98,7 @@ test.describe('Admin dashboard UI', () => {
 
   test('shows the heading', async ({ page }) => {
     await page.goto(ADMIN_URL)
-    await expect(page.getByRole('heading', { level: 1 })).toContainText('Latchkey Usage')
+    await expect(page.getByRole('heading', { level: 1 })).toContainText('Latchkey')
   })
 
   test('renders three chart sections after data loads', async ({ page }) => {

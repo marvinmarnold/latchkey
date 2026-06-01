@@ -2,17 +2,62 @@ import { Elysia, status } from 'elysia'
 import type { Database } from 'bun:sqlite'
 import { openDb, seedProviders } from './db'
 import { verifyBearerToken, extractTokenFromRequest } from './middleware/auth'
-import { assertSufficientBalance } from './middleware/balance'
+import { assertSufficientBalance, readUsdcAllowance } from './middleware/balance'
 import { normaliseAnthropicToOpenAI } from './format/normalise'
 import { translateOpenAIToAnthropic, openAIStreamToAnthropicStream } from './format/translate'
 import { selectListing, penaliseListing } from './router'
 import { forwardToProvider } from './forwarder'
 import { discoverModels } from './discovery'
-import { extractUsageFromStream, computeCost, logUsage } from './billing'
+import { extractUsageFromStream, extractUsageFromAnthropicStream, computeCost, logUsage } from './billing'
 import { enqueueProofJob, startProofWorker } from './zktls'
 import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
-import { queryUsage } from './admin'
+import { queryUsage, queryWallets, queryAllowance } from './admin'
+import { accrue, assertWalletAllowed } from './wallet'
+import { startPullWorker } from './puller'
+import { makePullChain } from './pullchain'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
+
+/**
+ * Convert an upstream provider error to the appropriate HTTP status.
+ * Rate-limit (429) and overload (529) are passed through verbatim so clients
+ * (e.g. Claude Code) can honour Retry-After and back off correctly instead of
+ * seeing a generic 502 and retrying aggressively.
+ * Only genuine provider failures (5xx other than 529) penalise the listing.
+ */
+function handleUpstreamError(
+  e: unknown,
+  db: ReturnType<typeof import('./db').openDb>,
+  listingId: string,
+): Response {
+  const upstreamStatus = (e as { statusCode?: number }).statusCode
+  const msg = e instanceof Error ? e.message : 'Provider error'
+
+  // Rate-limit and overload: pass status through, do NOT penalise.
+  // Also forward Retry-After so clients (e.g. Claude Code) know exactly how long to wait.
+  if (upstreamStatus === 429 || upstreamStatus === 529) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    const retryAfter = (e as { retryAfter?: string | null }).retryAfter
+    if (retryAfter) headers['Retry-After'] = retryAfter
+    return new Response(
+      JSON.stringify({ error: { type: 'rate_limit_error', message: msg } }),
+      { status: upstreamStatus, headers },
+    )
+  }
+
+  // Genuine provider failure: penalise reliability and return 502.
+  penaliseListing(db, listingId)
+  return new Response(
+    JSON.stringify({ error: { type: 'api_error', message: msg } }),
+    { status: 502, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
+// Phase 2 pull config — read at startup for the worker, but also re-read per-request
+// for the gate so test overrides of process.env take effect.
+const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
+const PULL_SCALE = 10 ** USDC_DECIMALS
+const PULL_THRESHOLD_USD = Number(process.env.PULL_THRESHOLD_USD ?? 0.10)
+const PULL_THRESHOLD_ATOMIC = BigInt(Math.round(PULL_THRESHOLD_USD * PULL_SCALE))
 
 export function buildApp(db: Database) {
   const app = new Elysia()
@@ -21,6 +66,14 @@ export function buildApp(db: Database) {
       set.headers['Access-Control-Allow-Origin'] = '*'
       return queryUsage(db)
     })
+    .get('/admin/wallets', ({ set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryWallets(db)
+    })
+    .get('/admin/allowance/:address', async ({ params, set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryAllowance(params.address)
+    })
 
   const api = new Elysia()
     .resolve(async ({ request }) => {
@@ -28,7 +81,18 @@ export function buildApp(db: Database) {
       if (!encoded) return status(401, { error: { type: 'authentication_error', message: 'Missing token' } })
       try {
         const { callerAddress, chain } = await verifyBearerToken(encoded)
-        await assertSufficientBalance(callerAddress, chain)
+        // Read at request time so test env overrides take effect.
+        const billingContract = process.env.BILLING_CONTRACT_ADDRESS || ''
+        if (billingContract) {
+          // Phase 2: RPC-free hot path — blocked check + first-seen allowance gate.
+          await assertWalletAllowed(db, callerAddress, {
+            readAllowance: (a) => readUsdcAllowance(a, billingContract),
+            thresholdAtomic: PULL_THRESHOLD_ATOMIC,
+          })
+        } else {
+          // Phase 1 mock mode.
+          await assertSufficientBalance(callerAddress, chain)
+        }
         return { callerAddress }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : 'Invalid token'
@@ -45,9 +109,13 @@ export function buildApp(db: Database) {
         const { stream, json, isStreaming } = await forwardToProvider(listing, req, req.model)
         if (isStreaming && stream) {
           const providerHost = new URL(listing.endpoint).hostname
-        const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+          let billed = false // guard: providers may emit multiple usage events; bill only once
+          const { stream: billedStream } = extractUsageFromStream(stream, usage => {
+            if (billed) return
+            billed = true
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
+            accrue(db, callerAddress, cost)
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           set.headers['Content-Type'] = 'text/event-stream'
@@ -56,13 +124,13 @@ export function buildApp(db: Database) {
           return new Response(billedStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+        const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
+        accrue(db, callerAddress, cost)
         try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
-        penaliseListing(db, listing.id)
-        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
+        return handleUpstreamError(e, db, listing.id)
       }
     })
 
@@ -75,25 +143,38 @@ export function buildApp(db: Database) {
         const { stream, json, isStreaming } = await forwardToProvider(listing, openAIReq, req.model)
         const msgProviderHost = new URL(listing.endpoint).hostname
         if (isStreaming && stream) {
-          const { stream: billedStream } = extractUsageFromStream(stream, usage => {
-            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
-            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
+          let msgBilled = false
+          const onUsage = (usage: { prompt_tokens: number; completion_tokens: number }) => {
+            if (msgBilled) return
+            msgBilled = true
+            const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+            const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsd: cost })
+            accrue(db, callerAddress, cost)
             try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
-          })
-          const anthropicStream = openAIStreamToAnthropicStream(billedStream)
+          }
+          // Anthropic upstream: stream is already Anthropic SSE — pass through unchanged.
+          // OpenAI upstream: extract OpenAI-format usage and convert to Anthropic SSE.
+          let responseStream: ReadableStream<Uint8Array>
+          if (listing.upstream_format === 'anthropic') {
+            const { stream: billedStream } = extractUsageFromAnthropicStream(stream, onUsage)
+            responseStream = billedStream
+          } else {
+            const { stream: billedStream } = extractUsageFromStream(stream, onUsage)
+            responseStream = openAIStreamToAnthropicStream(billedStream)
+          }
           set.headers['Content-Type'] = 'text/event-stream'
           set.headers['Cache-Control'] = 'no-cache'
           set.headers['Connection'] = 'keep-alive'
-          return new Response(anthropicStream)
+          return new Response(responseStream)
         }
         const oaiRes = json as OpenAIResponse
-        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
-        const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
+        const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input_usd_per_million, listing.price_output_usd_per_million)
+        const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsd: cost })
+        accrue(db, callerAddress, cost)
         try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
-        penaliseListing(db, listing.id)
-        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
+        return handleUpstreamError(e, db, listing.id)
       }
     })
 
@@ -120,4 +201,17 @@ if (import.meta.main) {
     (e) => console.warn('[fingerprint]', (e as Error).message),
   )
   startFingerprintWorker(db)
+  // Phase 2: pull-payment worker — only when a billing contract + signer are configured.
+  const billingContractAtStartup = process.env.BILLING_CONTRACT_ADDRESS || ''
+  if (billingContractAtStartup && process.env.PROXY_PRIVATE_KEY) {
+    const chain = makePullChain({
+      billingContract: billingContractAtStartup as `0x${string}`,
+      proxyPrivateKey: process.env.PROXY_PRIVATE_KEY as `0x${string}`,
+      rpcUrl: process.env.BASE_RPC_URL ?? 'https://sepolia.base.org',
+    })
+    startPullWorker(db, chain, { thresholdUsd: PULL_THRESHOLD_USD, scale: PULL_SCALE })
+    console.log(`[puller] pull-payment worker started (threshold $${PULL_THRESHOLD_USD}, contract ${billingContractAtStartup})`)
+  } else {
+    console.log('[puller] disabled — BILLING_CONTRACT_ADDRESS/PROXY_PRIVATE_KEY not set (Phase 1 mock mode)')
+  }
 }

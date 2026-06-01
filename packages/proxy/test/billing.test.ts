@@ -1,7 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach } from 'bun:test'
 import { openDb, closeDb, seedProviders } from '../src/db'
-import { logUsage, extractUsageFromStream } from '../src/billing'
+import { computeCost, logUsage, extractUsageFromStream } from '../src/billing'
 import type { Database } from 'bun:sqlite'
+
+describe('computeCost', () => {
+  it('returns dollars given per-million prices', () => {
+    // 1M input tokens at $0.27/M, 0 output → $0.27
+    expect(computeCost(1_000_000, 0, 0.27, 1.10)).toBeCloseTo(0.27, 10)
+  })
+
+  it('sums input and output independently', () => {
+    // 1M input @ $0.27/M + 1M output @ $1.10/M = $1.37
+    expect(computeCost(1_000_000, 1_000_000, 0.27, 1.10)).toBeCloseTo(1.37, 10)
+  })
+
+  it('does not round small fractional costs to an integer', () => {
+    // 10 input tokens @ $3/M = $0.00003 — must NOT become 0 or 1
+    expect(computeCost(10, 0, 3.0, 15.0)).toBeCloseTo(0.00003, 12)
+  })
+})
 
 let db: Database
 beforeEach(() => {
@@ -18,9 +35,9 @@ describe('logUsage', () => {
       modelId: 'deepseek-chat',
       inputTokens: 1_000_000,
       outputTokens: 1_000_000,
-      costUsdc: 1370,
+      costUsd: 1.37,
     })
-    expect(result.costUsdc).toBe(1370)
+    expect(result.costUsd).toBe(1.37)
     expect(typeof result.id).toBe('string')
     const row = db.query('SELECT * FROM billing_log').get() as { input_tokens: number }
     expect(row.input_tokens).toBe(1_000_000)

@@ -93,7 +93,7 @@ async function throwUpstreamError(response: Response): Promise<never> {
   const text = await response.text()
   throw Object.assign(
     new Error(`Provider error ${response.status}: ${text}`),
-    { statusCode: response.status },
+    { statusCode: response.status, retryAfter: response.headers.get('retry-after') },
   )
 }
 

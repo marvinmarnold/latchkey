@@ -7,6 +7,23 @@ const EVM_CONTRACT_ABI = parseAbi([
   'function balances(address) view returns (uint256)',
 ])
 
+const ERC20_ALLOWANCE_ABI = parseAbi([
+  'function allowance(address owner, address spender) view returns (uint256)',
+])
+
+/** Read the caller's USDC allowance to the billing contract, in atomic units. */
+export async function readUsdcAllowance(owner: string, spender: string): Promise<bigint> {
+  const usdc = process.env.USDC_ADDRESS as `0x${string}` | undefined
+  if (!usdc) return 0n
+  const client = getEvmClient()
+  return client.readContract({
+    address: usdc,
+    abi: ERC20_ALLOWANCE_ABI,
+    functionName: 'allowance',
+    args: [owner as `0x${string}`, spender as `0x${string}`],
+  })
+}
+
 function getEvmClient() {
   const rpcUrl = process.env.BASE_RPC_URL ?? 'https://sepolia.base.org'
   const isMainnet = rpcUrl.includes('mainnet') && !rpcUrl.includes('sepolia')
