@@ -131,3 +131,75 @@ describe('Auth', () => {
     expect(res.status).toBe(401)
   })
 })
+
+describe('Upstream error passthrough', () => {
+  // Spin up a second mock that returns 429 / 529 so we can verify the proxy
+  // passes the real status code through rather than always returning 502.
+  const RATE_MOCK_PORT = 18082
+  const RATE_PROXY_PORT = 18083
+  let rateMock: Elysia
+  let rateProxy: ReturnType<typeof buildApp>
+  let rateDb: ReturnType<typeof openDb>
+  let rateToken: string
+  let upstreamStatus = 429 // controlled per-test
+
+  beforeAll(async () => {
+    rateToken = await encodeBearerToken(TEST_KEY)
+    rateMock = new Elysia()
+      .post('/v1/chat/completions', ({ set }) => {
+        set.status = upstreamStatus
+        return { error: { message: 'rate limited', type: 'rate_limit_error' } }
+      })
+    rateMock.listen(RATE_MOCK_PORT)
+
+    rateDb = openDb(':memory:')
+    rateDb.run(`INSERT INTO providers (id, name) VALUES ('rate-p1', 'RateProvider')`)
+    rateDb.run(`INSERT INTO listings (id, provider_id, model_id, upstream_format, endpoint, price_input_usd_per_million, price_output_usd_per_million)
+      VALUES ('rate-l1', 'rate-p1', 'rate/model', 'openai', 'http://localhost:${RATE_MOCK_PORT}/v1', 0.27, 1.10)`)
+    rateProxy = buildApp(rateDb)
+    rateProxy.listen(RATE_PROXY_PORT)
+  })
+
+  afterAll(() => { rateProxy?.stop(); rateMock?.stop(); closeDb(rateDb) })
+
+  it('passes 429 through so clients respect Retry-After', async () => {
+    upstreamStatus = 429
+    const res = await fetch(`http://localhost:${RATE_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rateToken}` },
+      body: JSON.stringify({ model: 'rate/model', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    expect(res.status).toBe(429)
+  })
+
+  it('passes 529 (overloaded) through so clients back off correctly', async () => {
+    upstreamStatus = 529
+    const res = await fetch(`http://localhost:${RATE_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rateToken}` },
+      body: JSON.stringify({ model: 'rate/model', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    expect(res.status).toBe(529)
+  })
+
+  it('does not penalise the listing for rate-limit errors', async () => {
+    upstreamStatus = 429
+    await fetch(`http://localhost:${RATE_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rateToken}` },
+      body: JSON.stringify({ model: 'rate/model', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    const listing = rateDb.query('SELECT reliability FROM listings WHERE id = ?').get('rate-l1') as { reliability: number }
+    expect(listing.reliability).toBe(1.0) // unchanged — rate limits are not provider failures
+  })
+
+  it('still returns 502 for genuine provider errors (5xx)', async () => {
+    upstreamStatus = 500
+    const res = await fetch(`http://localhost:${RATE_PROXY_PORT}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${rateToken}` },
+      body: JSON.stringify({ model: 'rate/model', messages: [{ role: 'user', content: 'Hi' }] }),
+    })
+    expect(res.status).toBe(502)
+  })
+})

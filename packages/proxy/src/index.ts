@@ -17,6 +17,37 @@ import { startPullWorker } from './puller'
 import { makePullChain } from './pullchain'
 import type { AnthropicRequest, OpenAIRequest, OpenAIResponse } from './types'
 
+/**
+ * Convert an upstream provider error to the appropriate HTTP status.
+ * Rate-limit (429) and overload (529) are passed through verbatim so clients
+ * (e.g. Claude Code) can honour Retry-After and back off correctly instead of
+ * seeing a generic 502 and retrying aggressively.
+ * Only genuine provider failures (5xx other than 529) penalise the listing.
+ */
+function handleUpstreamError(
+  e: unknown,
+  db: ReturnType<typeof import('./db').openDb>,
+  listingId: string,
+): Response {
+  const upstreamStatus = (e as { statusCode?: number }).statusCode
+  const msg = e instanceof Error ? e.message : 'Provider error'
+
+  // Rate-limit and overload: pass status through, do NOT penalise.
+  if (upstreamStatus === 429 || upstreamStatus === 529) {
+    return new Response(
+      JSON.stringify({ error: { type: 'rate_limit_error', message: msg } }),
+      { status: upstreamStatus, headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
+  // Genuine provider failure: penalise reliability and return 502.
+  penaliseListing(db, listingId)
+  return new Response(
+    JSON.stringify({ error: { type: 'api_error', message: msg } }),
+    { status: 502, headers: { 'Content-Type': 'application/json' } },
+  )
+}
+
 // Phase 2 pull config — read at startup for the worker, but also re-read per-request
 // for the gate so test overrides of process.env take effect.
 const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
@@ -95,8 +126,7 @@ export function buildApp(db: Database) {
         try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
-        penaliseListing(db, listing.id)
-        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
+        return handleUpstreamError(e, db, listing.id)
       }
     })
 
@@ -131,8 +161,7 @@ export function buildApp(db: Database) {
         try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
-        penaliseListing(db, listing.id)
-        return status(502, { error: { type: 'api_error', message: (e as Error).message } })
+        return handleUpstreamError(e, db, listing.id)
       }
     })
 
