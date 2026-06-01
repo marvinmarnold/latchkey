@@ -7,9 +7,12 @@ const PROXY_PORT = 3002
 const MOCK_UPSTREAM_PORT = 3003
 const DB_PATH = path.join(__dirname, 'test.db')
 
-// The wallet used for E2E testing — matches TEST_PRIVATE_KEY in packages/proxy/.env
-const TEST_PRIVATE_KEY = '0x6007ce7814ba19c6db28ed536e710ae7a10454d2f599356beaa6a71f91ffa7f1'
-export const TEST_WALLET = '0xe65710F012F0Dc625c85Cd50Cb1b0A1e9E63Eb89'
+// Read from packages/proxy/.env — never hardcode here.
+const TEST_PRIVATE_KEY = process.env.TEST_PRIVATE_KEY
+if (!TEST_PRIVATE_KEY) throw new Error('TEST_PRIVATE_KEY env var is required for E2E tests')
+// Derive the wallet address from the key at runtime rather than hardcoding it.
+import { privateKeyToAccount } from 'viem/accounts'
+export const TEST_WALLET = privateKeyToAccount(TEST_PRIVATE_KEY as `0x${string}`).address
 
 async function waitForHealthy(url: string, timeoutMs = 20000): Promise<void> {
   const start = Date.now()
@@ -93,7 +96,7 @@ export default async function globalSetup() {
     const tokenProc = spawn(bunBinPath, [
       '-e',
       `import { encodeBearerToken } from './src/middleware/auth.ts'
-       const token = await encodeBearerToken('${TEST_PRIVATE_KEY}')
+       const token = await encodeBearerToken(process.env.TEST_PRIVATE_KEY)
        process.stdout.write(token)`,
     ], { cwd: proxyDir, stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''

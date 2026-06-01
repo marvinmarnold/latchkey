@@ -58,6 +58,19 @@ Run production E2E to confirm green.
 
 ---
 
+## Private key rule — NEVER commit secrets to source control
+
+Private keys, API keys, passwords, and any credentials must NEVER appear in any source-controlled file — not in test files, not in HTML, not in scripts, not in docs, not in session summaries.
+
+- All secrets live in `.env` files that are gitignored
+- Test files must read keys via `process.env.KEY_NAME` — never hardcode
+- Before committing, scan for raw 0x-prefixed hex keys, base58 seeds, or any `sk-`/`Bearer` patterns
+- If a key is ever found in git history, treat it as permanently compromised and rotate it immediately
+
+**Why this rule exists:** PROXY_PRIVATE_KEY and TEST_PRIVATE_KEY were both committed to a public repo (in session-summary.html and global-setup.ts respectively). Both had to be rotated and the billing contract redeployed.
+
+---
+
 ## Review rule — always verify with DeepSeek before finishing a phase
 
 Before declaring any phase of work done, call the DeepSeek API to review the implementation (see Phase completion protocol above).
