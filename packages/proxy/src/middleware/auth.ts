@@ -38,9 +38,11 @@ function solanaSigningPayload(address: string, expiry: number, nonce: string): U
 }
 
 export async function verifyBearerToken(encoded: string): Promise<{ callerAddress: string; chain: Chain }> {
+  // Strip the API-key prefix whether it arrives via extractTokenFromRequest or a direct call.
+  const payload = encoded.startsWith(TOKEN_PREFIX) ? encoded.slice(TOKEN_PREFIX.length) : encoded
   let token: BearerToken
   try {
-    token = JSON.parse(Buffer.from(encoded, 'base64').toString('utf8'))
+    token = JSON.parse(Buffer.from(payload, 'base64').toString('utf8'))
   } catch {
     throw new Error('Malformed token')
   }
@@ -96,7 +98,7 @@ export async function encodeBearerToken(
   })
 
   const token: BearerToken = { address: account.address, expiry, nonce, sig }
-  return Buffer.from(JSON.stringify(token)).toString('base64')
+  return TOKEN_PREFIX + Buffer.from(JSON.stringify(token)).toString('base64')
 }
 
 /** Generate a Solana bearer token (ed25519). secretKey is the 64-byte keypair or 32-byte seed. */
@@ -111,10 +113,15 @@ export async function encodeSolanaBearerToken(
   const message = solanaSigningPayload(address, expiry, nonce)
   const sig = bs58.encode(await ed.signAsync(message, privKey))
   const token: BearerToken = { address, expiry, nonce, sig }
-  return Buffer.from(JSON.stringify(token)).toString('base64')
+  return TOKEN_PREFIX + Buffer.from(JSON.stringify(token)).toString('base64')
 }
+
+/** Prefix added to all tokens so Claude Code and other tools treat them as API keys. */
+export const TOKEN_PREFIX = 'sk-ant-api03-'
 
 export function extractTokenFromRequest(request: Request): string {
   const auth = request.headers.get('authorization') ?? request.headers.get('x-api-key') ?? ''
-  return auth.startsWith('Bearer ') ? auth.slice(7) : auth
+  const raw = auth.startsWith('Bearer ') ? auth.slice(7) : auth
+  // Strip the API key prefix if present before decoding the payload.
+  return raw.startsWith(TOKEN_PREFIX) ? raw.slice(TOKEN_PREFIX.length) : raw
 }
