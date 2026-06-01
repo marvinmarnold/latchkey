@@ -48,7 +48,7 @@ export function buildApp(db: Database) {
         const { stream: billedStream } = extractUsageFromStream(stream, usage => {
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
             const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
-            enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens })
+            try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           set.headers['Content-Type'] = 'text/event-stream'
           set.headers['Cache-Control'] = 'no-cache'
@@ -58,7 +58,7 @@ export function buildApp(db: Database) {
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
         const { id: billingId1 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
-        enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens })
+        try { enqueueProofJob(db, { billingLogId: billingId1, callerAddress, providerHost: new URL(listing.endpoint).hostname, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return oaiRes
       } catch (e: unknown) {
         penaliseListing(db, listing.id)
@@ -78,7 +78,7 @@ export function buildApp(db: Database) {
           const { stream: billedStream } = extractUsageFromStream(stream, usage => {
             const cost = computeCost(usage.prompt_tokens, usage.completion_tokens, listing.price_input, listing.price_output)
             const { id } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens, costUsdc: cost })
-            enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens })
+            try { enqueueProofJob(db, { billingLogId: id, callerAddress, providerHost: msgProviderHost, inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }) } catch { /* non-fatal */ }
           })
           const anthropicStream = openAIStreamToAnthropicStream(billedStream)
           set.headers['Content-Type'] = 'text/event-stream'
@@ -89,7 +89,7 @@ export function buildApp(db: Database) {
         const oaiRes = json as OpenAIResponse
         const cost = computeCost(oaiRes.usage.prompt_tokens, oaiRes.usage.completion_tokens, listing.price_input, listing.price_output)
         const { id: billingId2 } = logUsage(db, { callerAddress, listingId: listing.id, modelId: req.model, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens, costUsdc: cost })
-        enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens })
+        try { enqueueProofJob(db, { billingLogId: billingId2, callerAddress, providerHost: msgProviderHost, inputTokens: oaiRes.usage.prompt_tokens, outputTokens: oaiRes.usage.completion_tokens }) } catch { /* non-fatal */ }
         return translateOpenAIToAnthropic(oaiRes)
       } catch (e: unknown) {
         penaliseListing(db, listing.id)

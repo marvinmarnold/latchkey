@@ -8,17 +8,23 @@ const dbPath = process.argv[2]
 const mockPort = process.argv[3] ?? '3003'
 if (!dbPath) throw new Error('Usage: bun seed-db.ts <db-path> [mock-port]')
 
+const portNum = Number(mockPort)
+if (!Number.isInteger(portNum) || portNum < 1 || portNum > 65535) {
+  throw new Error(`Invalid mock port: ${mockPort}`)
+}
+
 const db = new Database(dbPath)
-
-// Add a test-only listing pointing at the mock upstream
-db.run(
-  `INSERT OR REPLACE INTO providers (id, name, active) VALUES ('e2e-provider', 'E2EProvider', 1)`,
-)
-db.run(
-  `INSERT OR REPLACE INTO listings
-     (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output, active)
-   VALUES ('e2e-listing', 'e2e-provider', 'e2e-test-model', 'openai', 'http://localhost:${mockPort}/v1', 100, 200, 1)`,
-)
-
-db.close()
-console.log(`[seed] test listing injected → http://localhost:${mockPort}/v1`)
+try {
+  db.run(
+    `INSERT OR REPLACE INTO providers (id, name, active) VALUES ('e2e-provider', 'E2EProvider', 1)`,
+  )
+  db.run(
+    `INSERT OR REPLACE INTO listings
+       (id, provider_id, model_id, upstream_format, endpoint, price_input, price_output, active)
+     VALUES ('e2e-listing', 'e2e-provider', 'e2e-test-model', 'openai', ?, 100, 200, 1)`,
+    [`http://localhost:${portNum}/v1`],
+  )
+  console.log(`[seed] test listing injected → http://localhost:${portNum}/v1`)
+} finally {
+  db.close()
+}

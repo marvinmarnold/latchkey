@@ -10,6 +10,10 @@ contract Deploy is Script {
         address treasury = vm.envAddress("TREASURY_ADDRESS");
         address proxy = vm.envAddress("PROXY_ADDRESS");
 
+        require(usdc != address(0), "USDC_ADDRESS required");
+        require(treasury != address(0), "TREASURY_ADDRESS required");
+        require(proxy != address(0), "PROXY_ADDRESS required");
+
         vm.startBroadcast();
         PaypromptBalance balance = new PaypromptBalance(usdc, treasury, proxy);
         vm.stopBroadcast();

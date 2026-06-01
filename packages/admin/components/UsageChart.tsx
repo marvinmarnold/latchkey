@@ -22,7 +22,8 @@ function pivot(rows: UsageRow[]): Record<string, string | number>[] {
     const point: Record<string, string | number> = { date }
     for (const key of keys) {
       const row = rows.find(r => r.date === date && r.key === key)
-      point[truncateKey(key)] = row?.tokens ?? 0
+      // Use full key as the series identifier to avoid truncation collisions
+      point[key] = row?.tokens ?? 0
     }
     return point
   })
@@ -54,7 +55,7 @@ const tdStyle: React.CSSProperties = {
 
 export default function UsageChart({ title, rows }: { title: string; rows: UsageRow[] }) {
   const data = pivot(rows)
-  const keys = [...new Set(rows.map(r => truncateKey(r.key)))]
+  const keys = [...new Set(rows.map(r => r.key))]
 
   // Sort table rows: most recent date first, then by tokens desc
   const sorted = [...rows].sort((a, b) =>
@@ -76,12 +77,16 @@ export default function UsageChart({ title, rows }: { title: string; rows: Usage
             contentStyle={{ background: '#1c1c1c', border: '1px solid #333', borderRadius: 6 }}
             labelStyle={{ color: '#e5e5e5' }}
           />
-          <Legend wrapperStyle={{ fontSize: 11, color: '#a3a3a3' }} />
+          <Legend
+            wrapperStyle={{ fontSize: 11, color: '#a3a3a3' }}
+            formatter={(value: string) => truncateKey(value)}
+          />
           {keys.map((key, i) => (
             <Line
               key={key}
               type="monotone"
               dataKey={key}
+              name={truncateKey(key)}
               stroke={COLORS[i % COLORS.length]}
               dot={false}
               strokeWidth={2}
