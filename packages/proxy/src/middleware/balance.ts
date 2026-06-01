@@ -49,6 +49,8 @@ async function getSolanaUSDCBalance(walletAddress: string): Promise<bigint> {
   return amount ? BigInt(amount) : 0n
 }
 
+let _solanaMockWarned = false
+
 export async function getCallerBalance(callerAddress: string, chain: Chain = 'evm'): Promise<bigint> {
   if (chain === 'solana') {
     // Phase 5: Solana billing requires a deployed Solana program (not yet wired).
@@ -56,7 +58,10 @@ export async function getCallerBalance(callerAddress: string, chain: Chain = 'ev
     // accrued for dashboard visibility. Solana callers effectively pay nothing in this mode.
     // WARNING: do not enable SOLANA_BILLING_ENABLED=true until the on-chain program is live.
     if (process.env.SOLANA_BILLING_ENABLED !== 'true') {
-      console.warn(`[solana] mock balance returned for ${callerAddress} — billing not enforced`)
+      if (!_solanaMockWarned) {
+        console.warn('[solana] mock balance mode — Solana callers pay nothing (SOLANA_BILLING_ENABLED not set)')
+        _solanaMockWarned = true
+      }
       return BigInt(1_000_000_000)
     }
     return getSolanaUSDCBalance(callerAddress)

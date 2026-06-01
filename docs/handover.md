@@ -17,7 +17,7 @@ A Bun/Elysia HTTP proxy that:
 - Deployed to `api.latchkey.me` (Base Sepolia) via systemd on a Servury VPS
 
 ### Phase 2 — Pull-Payment Billing
-- `LatchkeyBilling.sol` deployed on Base Sepolia (`0x380ad468...`) — callers pre-approve a USDC allowance; the proxy pulls when accrued debt crosses the threshold ($0.01 for testing; configurable via `PULL_THRESHOLD_USD`, canonical default in `packages/proxy/src/config.ts`)
+- `LatchkeyBilling.sol` deployed on Base Sepolia (`0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9`) — callers pre-approve a USDC allowance; the proxy pulls when accrued debt crosses the threshold ($0.01 for testing; configurable via `PULL_THRESHOLD_USD`, canonical default in `packages/proxy/src/config.ts`)
 - Per-wallet state in SQLite (`wallet_state`): accrued debt, pull history, blocked flag
 - Crash-safe background worker: records pending pull (amount + raw signed tx) before broadcasting so a crash never double-bills or loses a pull
 - Admin dashboard (Next.js on Vercel) shows billing state, usage charts, and live USDC allowance per wallet
@@ -179,10 +179,10 @@ Two distinct on-chain money primitives by two different actors — **do not conf
 
 | Resource | Value |
 |---|---|
-| VPS | `root@151.247.22.152` — SSH via `~/.ssh/id_ed25519` |
+| VPS | See private runbook (IP, SSH key redacted from repo) |
 | Server domain | `api.latchkey.me` (Cloudflare A record) |
 | Admin URL | `https://payprompt-admin.vercel.app` |
-| Vercel project | `payprompt-admin` under `geekyrocks` |
+| Vercel project | See private runbook |
 | GitHub repo | `git@github.com:marvinmarnold/latchkey.git` |
 | Network | Base Sepolia (EVM) — USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` |
-| Billing contract | `0x380ad468...` (Base Sepolia) |
+| Billing contract | `0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9` (Base Sepolia) |

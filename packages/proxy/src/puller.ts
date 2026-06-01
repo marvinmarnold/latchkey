@@ -1,7 +1,7 @@
 import { keccak256 } from 'viem'
 import type { Database } from 'bun:sqlite'
 import type { WalletState } from './wallet'
-import { DEFAULT_PULL_THRESHOLD_USD } from './config'
+import { DEFAULT_PULL_THRESHOLD_USD, PULL_SCALE } from './config'
 
 /**
  * Chain seam for the pull worker. Kept tiny and injectable so the whole
@@ -64,7 +64,7 @@ function fail(db: Database, address: string, maxFailures: number): void {
  */
 export async function processPulls(db: Database, chain: PullChain, opts: PullOpts = {}): Promise<void> {
   const thresholdUsd = opts.thresholdUsd ?? DEFAULT_PULL_THRESHOLD_USD
-  const scale = opts.scale ?? 1_000_000
+  const scale = opts.scale ?? PULL_SCALE
   const maxFailures = opts.maxFailures ?? 3
 
   // 1. Reconcile in-flight pulls FIRST (selected by pending_pull_usd, set before broadcast).
@@ -90,10 +90,13 @@ export async function processPulls(db: Database, chain: PullChain, opts: PullOpt
 
   // 2. New pulls for wallets over threshold with nothing in flight.
   // Skip any wallet already handled in step 1 — one action per wallet per sweep.
+  // EVM addresses start with 0x; Solana addresses are base58 (no 0x prefix).
+  // Exclude Solana wallets — there is no Solana PullChain yet.
   const due = db
     .query<{ address: string; accrued_usd: number }, [number]>(
       `SELECT address, accrued_usd FROM wallet_state
-       WHERE accrued_usd >= ? AND blocked = 0 AND pending_pull_usd IS NULL`,
+       WHERE accrued_usd >= ? AND blocked = 0 AND pending_pull_usd IS NULL
+         AND address LIKE '0x%'`,
     )
     .all(thresholdUsd)
   for (const w of due) {
