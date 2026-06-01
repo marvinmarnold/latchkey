@@ -48,16 +48,17 @@ Before your first request, you must approve the billing contract to pull from yo
 
 **Using cast (Foundry):**
 ```bash
+read -s -p "Private key (0x...): " PK && echo
 cast send 0x036CbD53842c5426634e7929541eC2318f3dCF7e \
   "approve(address,uint256)" \
-  0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7 \
+  0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9 \
   1000000 \
   --rpc-url https://sepolia.base.org \
-  --private-key 0xYOUR_PRIVATE_KEY
+  --private-key "$PK"
 ```
 This approves $1.00 (1,000,000 atomic units at 6 decimals), enough for ~100 cheap requests.
 
-**Using a wallet UI (MetaMask, Rabby, etc.):** Connect to Base Sepolia, call `approve` on the USDC contract (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`) with the billing contract as spender (`0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7`).
+**Using a wallet UI (MetaMask, Rabby, etc.):** Connect to Base Sepolia, call `approve` on the USDC contract (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`) with the billing contract as spender (`0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9`).
 
 **Verify your allowance:**
 ```bash
@@ -69,10 +70,11 @@ curl -s https://api.latchkey.me/admin/allowance/0xYOUR_WALLET_ADDRESS | python3 
 ## Step 3 — Generate your bearer token
 
 ```bash
+read -s -p "Private key (0x...): " PK && echo
 cd packages/proxy
-bun -e "
+PK="$PK" bun -e "
 import { encodeBearerToken } from './src/middleware/auth.ts';
-const token = await encodeBearerToken('0xYOUR_PRIVATE_KEY_HERE');
+const token = await encodeBearerToken(process.env.PK);
 process.stdout.write(token);
 "
 ```

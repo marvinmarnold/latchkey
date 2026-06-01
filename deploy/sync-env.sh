@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Write the production .env to the server.
+# Write the production .env to the server from packages/proxy/.env (single source of truth).
 # Usage: bash deploy/sync-env.sh
-# Reads from packages/proxy/.env (same as deploy.sh).
 set -euo pipefail
 
 ENV_FILE="$(dirname "$0")/../packages/proxy/.env"
@@ -16,22 +15,45 @@ HOST="${DEPLOY_HOST:?DEPLOY_HOST required}"
 APP_DIR="/root/latchkey"
 
 ssh -i ~/.ssh/id_ed25519 root@"$HOST" "cat > $APP_DIR/packages/proxy/.env" << ENV
+# --- Server ------------------------------------------------------------------
 PORT=3000
 DB_PATH=$APP_DIR/packages/proxy/latchkey.db
 NODE_ENV=production
+
+# --- Provider API keys -------------------------------------------------------
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
 DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
 OPENAI_API_KEY=${OPENAI_API_KEY:-}
+
+# --- EVM / Base Sepolia ------------------------------------------------------
 BASE_RPC_URL=${BASE_RPC_URL:-https://sepolia.base.org}
-BALANCE_CONTRACT_ADDRESS=${BALANCE_CONTRACT_ADDRESS:-}
-SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
-SOLANA_USDC_MINT=${SOLANA_USDC_MINT:-4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU}
-SOLANA_TEST_PUBLIC_KEY=${SOLANA_TEST_PUBLIC_KEY:-}
-BILLING_CONTRACT_ADDRESS=${BILLING_CONTRACT_ADDRESS:-}
-PROXY_PRIVATE_KEY=${PROXY_PRIVATE_KEY:-}
 USDC_ADDRESS=${USDC_ADDRESS:-0x036CbD53842c5426634e7929541eC2318f3dCF7e}
 USDC_DECIMALS=${USDC_DECIMALS:-6}
+
+# --- Billing contract --------------------------------------------------------
+BILLING_CONTRACT_ADDRESS=${BILLING_CONTRACT_ADDRESS:-}
+PROXY_PRIVATE_KEY=${PROXY_PRIVATE_KEY:-}
+TREASURY_ADDRESS=${TREASURY_ADDRESS:-}
+
+# --- Pull-payment thresholds -------------------------------------------------
 PULL_THRESHOLD_USD=${PULL_THRESHOLD_USD:-0.01}
+MIN_CALLER_DEPOSIT_USD=${MIN_CALLER_DEPOSIT_USD:-1}
+
+# --- Test / E2E wallets -------------------------------------------------------
+TEST_PRIVATE_KEY=${TEST_PRIVATE_KEY:-}
+
+# --- Legacy ------------------------------------------------------------------
+BALANCE_CONTRACT_ADDRESS=${BALANCE_CONTRACT_ADDRESS:-}
+
+# --- Solana rail -------------------------------------------------------------
+SOLANA_USDC_MINT=${SOLANA_USDC_MINT:-4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU}
+SOLANA_RPC_URL=${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+SOLANA_BILLING_ENABLED=${SOLANA_BILLING_ENABLED:-}
+SOLANA_TEST_PUBLIC_KEY=${SOLANA_TEST_PUBLIC_KEY:-}
+
+# --- Indexer -----------------------------------------------------------------
+INDEXER_RPC_URL=${INDEXER_RPC_URL:-}
+INDEXER_START_BLOCK=${INDEXER_START_BLOCK:-}
 ENV
 
 echo "✅ .env synced to $HOST"

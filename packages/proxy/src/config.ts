@@ -9,14 +9,22 @@
  */
 export const DEFAULT_PULL_THRESHOLD_USD = 0.01
 
+function envNum(key: string, fallback: number): number {
+  const raw = process.env[key]
+  if (!raw || raw.trim() === '') return fallback
+  const v = Number(raw)
+  if (!Number.isFinite(v)) throw new Error(`config: ${key}=${raw} is not a valid number`)
+  return v
+}
+
+export const USDC_DECIMALS = envNum('USDC_DECIMALS', 6)
+export const PULL_SCALE = 10 ** USDC_DECIMALS
+export const PULL_THRESHOLD_USD = envNum('PULL_THRESHOLD_USD', DEFAULT_PULL_THRESHOLD_USD)
+export const PULL_THRESHOLD_ATOMIC = BigInt(Math.round(PULL_THRESHOLD_USD * PULL_SCALE))
+
 /**
  * Minimum Caller Deposit (USD). Enforced on-chain by the billing contract once built;
  * surfaced here as the canonical value for onboarding UX and proxy-side error messages.
  * The proxy fronts at most min(remainingDeposit, PULL_THRESHOLD_USD) of unsettled usage.
  */
-export const MIN_CALLER_DEPOSIT_USD = 1
-
-export const USDC_DECIMALS = Number(process.env.USDC_DECIMALS ?? 6)
-export const PULL_SCALE = 10 ** USDC_DECIMALS
-export const PULL_THRESHOLD_USD = Number(process.env.PULL_THRESHOLD_USD ?? DEFAULT_PULL_THRESHOLD_USD)
-export const PULL_THRESHOLD_ATOMIC = BigInt(Math.round(PULL_THRESHOLD_USD * PULL_SCALE))
+export const MIN_CALLER_DEPOSIT_USD = envNum('MIN_CALLER_DEPOSIT_USD', 1)
