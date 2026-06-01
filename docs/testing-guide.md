@@ -108,11 +108,32 @@ curl https://api.latchkey.me/v1/chat/completions \
 ```
 
 ### Option C — Claude Code
+
+Claude Code reads `ANTHROPIC_BASE_URL` and `ANTHROPIC_API_KEY` from your environment. You need to set these **before** launching `claude`, and the easiest way to make them permanent is to add them to your shell config.
+
+**1. Add to your shell config** (`~/.zshrc`, `~/.bashrc`, or equivalent):
 ```bash
 export ANTHROPIC_BASE_URL=https://api.latchkey.me
 export ANTHROPIC_API_KEY=sk-ant-api03-YOUR_TOKEN
+```
+
+**2. Reload your shell:**
+```bash
+source ~/.zshrc   # or source ~/.bashrc
+```
+
+**3. Make sure your wallet is funded and approved** (Steps 1–2 above must be complete):
+- You have Base Sepolia ETH (gas) and USDC in your wallet
+- You've run the `cast send approve` command to grant the billing contract a USDC allowance
+
+**4. Launch Claude Code:**
+```bash
 claude
 ```
+
+**5. Verify it's working** — after your first prompt, open https://payprompt-admin.vercel.app and find your wallet address in the usage table. If it's there, billing is wired up correctly.
+
+> **Tip:** If `claude` launches but returns a 402 error, your allowance isn't set (Step 2). If it returns 401, your token is wrong or expired — regenerate it (Step 3).
 
 ### Option D — Cursor or any OpenAI-compatible client
 Set base URL to `https://api.latchkey.me` and API key to your token.
