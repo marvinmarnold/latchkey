@@ -11,7 +11,7 @@ import { discoverModels } from './discovery'
 import { extractUsageFromStream, computeCost, logUsage } from './billing'
 import { enqueueProofJob, startProofWorker } from './zktls'
 import { fingerprintAllListings, startFingerprintWorker } from './fingerprint'
-import { queryUsage } from './admin'
+import { queryUsage, queryWallets, queryAllowance } from './admin'
 import { accrue, assertWalletAllowed } from './wallet'
 import { startPullWorker } from './puller'
 import { makePullChain } from './pullchain'
@@ -31,6 +31,14 @@ export function buildApp(db: Database) {
     .get('/admin/usage', ({ set }) => {
       set.headers['Access-Control-Allow-Origin'] = '*'
       return queryUsage(db)
+    })
+    .get('/admin/wallets', ({ set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryWallets(db)
+    })
+    .get('/admin/allowance/:address', async ({ params, set }) => {
+      set.headers['Access-Control-Allow-Origin'] = '*'
+      return queryAllowance(params.address)
     })
 
   const api = new Elysia()
