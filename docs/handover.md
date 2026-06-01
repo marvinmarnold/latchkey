@@ -68,7 +68,7 @@ Callers generate bearer tokens client-side using `encodeSolanaBearerToken(seed: 
 | Question | Notes |
 |---|---|
 | zkTLS library | No production-ready option as of mid-2026. Revisit when TLSNotary or Reclaim Protocol reaches v1.0. |
-| Solana on-chain billing | Requires a deployed Solana program (SPL escrow / pull-payment). Significant work; billing is in mock mode. |
+| Solana on-chain billing | Requires a deployed Solana program (SPL escrow / pull-payment). Significant work; billing is in mock mode. The pull worker (`puller.ts`) is EVM-only — Solana wallets accrue debt in `wallet_state` but it is never settled on-chain. A separate Solana `PullChain` implementation is needed. |
 | Nonce replay protection | Both EVM and Solana bearer tokens are replayable until expiry. A DB-backed nonce store with TTL would close this. Low risk at current scale; high priority at scale. |
 | Fingerprint slashing | Phase 4 logs mismatches but does not slash. Requires the staking contract (Phase D below). |
 | Provider discovery | `discoverModels()` runs at startup and populates model metadata from upstream APIs. Not yet deeply integrated into routing logic. |

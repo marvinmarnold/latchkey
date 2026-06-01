@@ -1,5 +1,7 @@
 # Caller Deposit: true on-chain collateral with cooldown withdrawal
 
+> **Status: not yet built.** The deployed `LatchkeyBilling` contract still uses the allowance-gate model. This ADR records the decided target architecture.
+
 A Caller posts a **Caller Deposit** — USDC custodied in the billing contract — before using the proxy. This replaces the v1 allowance-gate model (funds stay in the user's wallet; the proxy pulls via an ERC-20 allowance) with deposited collateral held by the contract. Chosen over reusing the already-deployed allowance gate because we want real collateral that enables the `min(deposit − used, PULL_THRESHOLD_USD)` fronting cap and a path to on-chain settlement guarantees.
 
 A Caller Deposit is **distinct from a Provider's Stake**: it is credit collateral, never a fraud bond, and is **never slashed** (Callers consume inference; they have nothing to defraud). It only bounds the proxy's fronting exposure.

@@ -56,9 +56,13 @@ A Provider caught serving a different model than declared is slashed and deliste
 USDC deposited by a **Provider** before listing on the Marketplace. Slashed (partially or fully forfeited) only for provable fraud — serving a different model than declared, or overbilling. Downtime is not a slashable offence; it affects the Provider's Router score instead. No protocol token in v1. _Not_ to be used for the Caller side — a Caller posts a **Caller Deposit**, which is never slashed.
 
 ## Caller Deposit
+> **Status: not yet built.** The deployed contract (`LatchkeyBilling`) still uses the allowance-gate model (ADR 0004). This definition describes the target architecture.
+
 USDC a **Caller** deposits into the billing contract before using the proxy — credit collateral, never a fraud bond and never slashed. Minimum deposit **$1**. It bounds how much inference the proxy will front before settling on-chain: at any moment a Caller may have at most `min(deposit − used, PULL_THRESHOLD_USD)` of unsettled (fronted) usage — the smaller of their remaining deposit and the pull threshold; beyond that the proxy settles or returns 402. The Caller withdraws unused deposit subject to outstanding **Accrued Debt** being settled first. Distinct from a Provider's slashable Stake in actor, purpose, and fate.
 
 ## Session
+> **Status: the Session definition below reflects the target Caller Deposit model (not yet built). The deployed proxy uses an allowance gate; see ADR 0004.**
+
 The active billing period for a Caller — the window during which the Caller has a sufficient **Caller Deposit** held by the billing contract and their wallet is not blocked. No discrete on-chain open/close event; the Session is a soft construct defined by the presence of a sufficient deposit. Inference requests accrue debt off-chain and the proxy settles on-chain against the deposit (see **Caller Deposit** for the `min(deposit − used, PULL_THRESHOLD_USD)` fronting cap, and **Pull Threshold**). If an on-chain settlement fails three consecutive times, the wallet is blocked and the next request returns HTTP 402.
 
 (Historical note: v1 as deployed defines the Session by a sufficient USDC *allowance* rather than a deposit; the move to a Caller Deposit is recorded in ADR 0004 and not yet built.)

@@ -56,6 +56,11 @@ function fail(db: Database, address: string, maxFailures: number): void {
 /**
  * One sweep of the pull queue. Safe to run on an interval.
  * Step 1 reconciles any in-flight pull (crash recovery); step 2 starts new pulls.
+ *
+ * NOTE: this worker only handles EVM wallets via the provided PullChain (viem/Base).
+ * Solana wallets accrue debt in wallet_state just like EVM wallets, but there is no
+ * Solana PullChain implementation yet — their accrued_usd is never settled on-chain.
+ * When Solana billing is wired, a separate Solana PullChain must be registered here.
  */
 export async function processPulls(db: Database, chain: PullChain, opts: PullOpts = {}): Promise<void> {
   const thresholdUsd = opts.thresholdUsd ?? DEFAULT_PULL_THRESHOLD_USD

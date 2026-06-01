@@ -213,8 +213,11 @@ if (import.meta.main) {
   } else {
     console.log('[puller] disabled — BILLING_CONTRACT_ADDRESS/PROXY_PRIVATE_KEY not set (Phase 1 mock mode)')
   }
-  // Phase 5: Solana auth is active. On-chain billing requires SOLANA_BILLING_ENABLED=true.
+  // Phase 5: Solana auth is active. Billing is mock by default — all Solana wallets get
+  // a synthetic 1000 USDC balance and pay nothing. This is intentional while the Solana
+  // billing program is not yet deployed. Set SOLANA_BILLING_ENABLED=true ONLY when the
+  // on-chain program is live; otherwise Solana usage is unmetered.
   if (process.env.SOLANA_BILLING_ENABLED !== 'true') {
-    console.log('[solana] auth enabled; billing in mock mode — set SOLANA_BILLING_ENABLED=true to enforce real SPL balance checks')
+    console.warn('[solana] WARNING: billing is in mock mode — Solana callers pay nothing. Set SOLANA_BILLING_ENABLED=true to enforce real SPL balance checks.')
   }
 }

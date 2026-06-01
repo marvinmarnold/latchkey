@@ -51,10 +51,14 @@ async function getSolanaUSDCBalance(walletAddress: string): Promise<bigint> {
 
 export async function getCallerBalance(callerAddress: string, chain: Chain = 'evm'): Promise<bigint> {
   if (chain === 'solana') {
-    // Phase 5: on-chain Solana billing requires a deployed Solana program (not yet wired).
-    // Gate the real SPL check behind SOLANA_BILLING_ENABLED=true; otherwise pass through
-    // with a mock balance so usage is still accrued for dashboard visibility.
-    if (process.env.SOLANA_BILLING_ENABLED !== 'true') return BigInt(1_000_000_000)
+    // Phase 5: Solana billing requires a deployed Solana program (not yet wired).
+    // Until SOLANA_BILLING_ENABLED=true, return a synthetic balance so usage is
+    // accrued for dashboard visibility. Solana callers effectively pay nothing in this mode.
+    // WARNING: do not enable SOLANA_BILLING_ENABLED=true until the on-chain program is live.
+    if (process.env.SOLANA_BILLING_ENABLED !== 'true') {
+      console.warn(`[solana] mock balance returned for ${callerAddress} — billing not enforced`)
+      return BigInt(1_000_000_000)
+    }
     return getSolanaUSDCBalance(callerAddress)
   }
 
