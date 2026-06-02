@@ -351,7 +351,7 @@ describe('Solana auth', () => {
 
   it('accepts a Solana token even when BILLING_CONTRACT_ADDRESS is set (skips EVM gate)', async () => {
     const prevBilling = process.env.BILLING_CONTRACT_ADDRESS
-    process.env.BILLING_CONTRACT_ADDRESS = '0x380ad4686d1374b2f301d8d6bb16270e2b0e83f7'
+    process.env.BILLING_CONTRACT_ADDRESS = '0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9'
     try {
       const res = await fetch(`http://localhost:${SOL_PROXY_PORT}/v1/chat/completions`, {
         method: 'POST',

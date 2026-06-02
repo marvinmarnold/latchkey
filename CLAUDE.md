@@ -126,10 +126,10 @@ All four steps are required for **app/provider vars** (API keys the proxy uses).
 | Phase | Status | Notes |
 |-------|--------|-------|
 | 1 — Proxy | ✅ deployed, tested | EVM-only auth. `BALANCE_CONTRACT_ADDRESS=` (mock) |
-| 2 — Pull-payment billing | ✅ deployed, PR #2 open | `LatchkeyBilling.sol` on Base Sepolia; pull worker active ($0.01 threshold) |
+| 2 — Pull-payment billing | ✅ deployed | `LatchkeyBilling.sol` at `0x7ddF81666B5b0ABcF26eA1576aD257244eF2F9f9` (Base Sepolia); pull worker active ($0.01 threshold). Proxy wallet: `0xe7Ce0c8cFD304A6aB8Dc51d1B9FA50E15C2c5f6D` |
 | 3 — zkTLS | 🔲 stub only | Proof queue exists; no prover integrated (no production library available mid-2026) |
 | 4 — Fingerprinting | ✅ running | Logs mismatches; no slashing yet |
-| 5 — Solana rail | 🔄 in progress | Enabling ed25519 auth; on-chain Solana billing is Phase 5+ |
+| 5 — Solana rail | ✅ deployed | ed25519 bearer token auth live; on-chain Solana billing intentionally in mock mode (`SOLANA_BILLING_ENABLED` not set) — Solana callers pay nothing until a Solana program is deployed |
 
 ---
 
