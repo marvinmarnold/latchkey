@@ -9,13 +9,17 @@ contract Deploy is Script {
         address usdc     = vm.envAddress("USDC_ADDRESS");
         address treasury = vm.envAddress("TREASURY_ADDRESS");
         address proxy    = vm.envAddress("PROXY_ADDRESS");
+        // OWNER_ADDRESS rotates proxy/treasury after deploy; keep it a cold key or multisig,
+        // separate from the hot PROXY_ADDRESS. Falls back to the deployer's tx origin if unset.
+        address ownerAddr = vm.envOr("OWNER_ADDRESS", address(0));
+        if (ownerAddr == address(0)) ownerAddr = msg.sender;
 
         require(usdc     != address(0), "USDC_ADDRESS required");
         require(treasury != address(0), "TREASURY_ADDRESS required");
         require(proxy    != address(0), "PROXY_ADDRESS required");
 
         vm.startBroadcast();
-        LatchkeyBilling billing = new LatchkeyBilling(usdc, treasury, proxy);
+        LatchkeyBilling billing = new LatchkeyBilling(usdc, treasury, proxy, ownerAddr);
         vm.stopBroadcast();
 
         console.log("LatchkeyBilling deployed at:", address(billing));
